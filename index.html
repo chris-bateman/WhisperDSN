@@ -239,6 +239,78 @@
   }
   .pulse-hint.visible { opacity: 1; }
 
+  .source-link .sep {
+    color: var(--muted);
+    margin: 0 6px;
+  }
+
+  .about-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: rgba(5,7,10,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .about-overlay.visible { display: flex; }
+  .about-panel {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 36px 40px;
+    max-width: 520px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .about-panel h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--gold);
+    margin-bottom: 16px;
+  }
+  .about-panel h3 {
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 20px;
+    margin-bottom: 8px;
+  }
+  .about-panel p {
+    margin-bottom: 12px;
+    color: var(--dim);
+  }
+  .about-panel a {
+    color: var(--gold);
+    text-decoration: none;
+  }
+  .about-panel a:hover { text-decoration: underline; }
+  .about-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--dim);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .about-close:hover { color: var(--text); }
+  .about-footer {
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
   @media (max-width: 600px) {
     .title-card { top: 16px; left: 16px; }
     .title-card h1 { font-size: 18px; }
@@ -279,6 +351,28 @@
 
 <div class="source-link">
   <a href="https://eyes.nasa.gov/apps/dsn-now/dsn.html" target="_blank">data: nasa/jpl dsn</a>
+  <span class="sep">/</span>
+  <a href="#" id="about-link">about</a>
+</div>
+
+<div class="about-overlay" id="about-overlay">
+  <div class="about-panel">
+    <button class="about-close" id="about-close">&times;</button>
+    <h2>WhisperDSN</h2>
+    <p>A live visualization of NASA's Deep Space Network — the array of giant radio antennas that humanity uses to communicate with spacecraft across the solar system.</p>
+    <p>Three ground stations in California, Spain, and Australia take turns talking to every active mission, from rovers on Mars to Voyager at the edge of interstellar space.</p>
+    <p>What you see here is real. The connections, the data rates, the distances — all sourced from NASA's live DSN feed, updated every five seconds.</p>
+    <h3>What the colors mean</h3>
+    <p><span style="color:var(--gold)">Gold</span> — the station is transmitting commands to the spacecraft.<br>
+    <span style="color:var(--blue)">Blue</span> — the station is receiving data back.<br>
+    <span style="color:var(--green)">Green</span> — two-way link, talking and listening simultaneously.<br>
+    <span style="color:var(--muted)">Gray</span> — the dish is pointed but idle.</p>
+    <h3>Light pulses</h3>
+    <p>Click any spacecraft to send a pulse of light toward it. The pulse travels at proportional speed — a signal to the Moon arrives in about 1.3 seconds. A signal to Voyager takes over 23 hours. You can click multiple spacecraft to race them.</p>
+    <h3>The map fills up over time</h3>
+    <p>Spacecraft stay on screen for 24 hours after they were last tracked. As the Earth rotates and different stations pick up different targets, the sky fills with everything the DSN is talking to. Check back later and you'll see more.</p>
+    <p class="about-footer">Built by <a href="https://chrisb.cloud" target="_blank">Chris Bateman</a>. Data from <a href="https://eyes.nasa.gov/apps/dsn-now/dsn.html" target="_blank">NASA/JPL DSN Now</a>.</p>
+  </div>
 </div>
 
 <button class="audio-toggle" id="audio-toggle" title="Toggle ambient audio">&#9834;</button>
@@ -727,12 +821,12 @@ function draw(t) {
 
   // Draw stations and dishes
   stationPositions.forEach(s => {
-    // Station glow
-    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 40);
-    grad.addColorStop(0, 'rgba(212,162,106,0.10)');
+    // Station glow (subtle, won't accumulate with fade-trail)
+    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 20);
+    grad.addColorStop(0, 'rgba(212,162,106,0.04)');
     grad.addColorStop(1, 'rgba(212,162,106,0)');
     ctx.fillStyle = grad;
-    ctx.fillRect(s.x - 40, s.y - 40, 80, 80);
+    ctx.fillRect(s.x - 20, s.y - 20, 40, 40);
 
     // Draw individual dish dots
     const stationConns = connections.filter(c => c.station.id === s.id);
@@ -1142,6 +1236,100 @@ async function fetchSpacecraftNames() {
     }
   } catch(e) {}
 }
+
+// ── About overlay ────────────────────────────────────────────────────
+document.getElementById('about-link').addEventListener('click', e => {
+  e.preventDefault();
+  document.getElementById('about-overlay').classList.add('visible');
+});
+document.getElementById('about-close').addEventListener('click', () => {
+  document.getElementById('about-overlay').classList.remove('visible');
+});
+document.getElementById('about-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('about-overlay').classList.remove('visible');
+  }
+});
+
+// ── Last-seen cache (24hr persistence via localStorage) ──────────────
+const SEEN_KEY = 'whisperdsn_seen';
+const SEEN_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function loadSeen() {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw);
+    const now = Date.now();
+    // Prune expired entries
+    Object.keys(data).forEach(k => {
+      if (now - data[k].ts > SEEN_TTL) delete data[k];
+    });
+    return data;
+  } catch(e) { return {}; }
+}
+
+function saveSeen(seen) {
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch(e) {}
+}
+
+// Called after each data parse — merge current connections into seen cache
+function updateSeen() {
+  const seen = loadSeen();
+  const now = Date.now();
+  connections.forEach(c => {
+    seen[c.scId] = {
+      ts: now,
+      range: c.range,
+      rtlt: c.rtlt,
+      stationId: c.station.id,
+      dish: c.dish,
+      hasActiveUp: c.hasActiveUp,
+      hasActiveDown: c.hasActiveDown,
+      activity: c.activity,
+      dataRate: c.dataRate,
+    };
+  });
+  saveSeen(seen);
+}
+
+// Inject stale (last-seen) spacecraft as ghost connections
+function injectStale() {
+  const seen = loadSeen();
+  const positions = getStationPositions();
+  const activeIds = new Set(connections.map(c => c.scId));
+
+  Object.entries(seen).forEach(([scId, data]) => {
+    if (activeIds.has(scId)) return; // already live
+    const stationPos = positions.find(p => p.id === data.stationId);
+    if (!stationPos) return;
+
+    connections.push({
+      station: stationPos,
+      dish: data.dish,
+      scId,
+      range: data.range,
+      rtlt: data.rtlt,
+      hasActiveUp: false,
+      hasActiveDown: false,
+      activity: data.activity || '',
+      dataRate: 0,
+      targetX: 0, targetY: 0,
+      renderX: 0, renderY: 0,
+      stale: true,
+    });
+  });
+}
+
+// Wrap the original fetchDSN to inject stale after each parse
+const _originalFetchDSN = fetchDSN;
+fetchDSN = async function() {
+  await _originalFetchDSN();
+  updateSeen();
+  injectStale();
+  // Re-run layout with the stale entries included
+  layoutConnections(connections);
+};
 
 fetchSpacecraftNames();
 fetchDSN();
