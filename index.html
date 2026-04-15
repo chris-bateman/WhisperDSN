@@ -809,10 +809,10 @@ function draw(t) {
     const x = lp.sx + (lp.tx - lp.sx) * progress;
     const y = lp.sy + (lp.ty - lp.sy) * progress;
 
-    // Clean bright dot, no glow
+    // Pulse dot — moderate alpha so fade-trail can clear it
     ctx.beginPath();
     ctx.arc(x, y, 2, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,240,200,0.9)';
+    ctx.fillStyle = 'rgba(212,162,106,0.5)';
     ctx.fill();
 
     // Timer label — shows real light time elapsed
