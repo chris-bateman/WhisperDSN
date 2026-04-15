@@ -277,66 +277,10 @@
 <canvas id="c"></canvas>
 
 <script>
-// ── Spacecraft Database ──────────────────────────────────────────────
-const SPACECRAFT = {
-  'ACE': { full: 'Advanced Composition Explorer', short: 'ACE', desc: 'Studies solar wind and cosmic rays from the L1 Lagrange point. Launched 1997.' },
-  'AKTS': { full: 'Akatsuki', desc: 'JAXA Venus orbiter studying the planet\'s atmosphere and weather. Launched 2010.' },
-  'CAS': { full: 'Cassini', desc: 'Explored Saturn and its moons for 13 years. Mission ended 2017.' },
-  'CHDR': { full: 'Chandra X-ray Observatory', short: 'Chandra', desc: 'Space telescope observing X-rays from hot regions of the universe. Launched 1999.' },
-  'CLPS': { full: 'CLPS Lander', desc: 'Commercial Lunar Payload Services delivery to the Moon\'s surface.' },
-  'DAVINCI': { full: 'DAVINCI', desc: 'NASA mission to study Venus\' atmosphere. Planned launch late 2020s.' },
-  'DSCO': { full: 'DSCOVR', desc: 'Deep Space Climate Observatory at L1. Monitors solar wind and photographs the sunlit Earth.' },
-  'EM1': { full: 'Artemis I Orion', desc: 'Uncrewed test flight of the Orion spacecraft around the Moon.' },
-  'EM2': { full: 'Artemis II Orion', desc: 'First crewed Artemis mission flying astronauts around the Moon.' },
-  'EM3': { full: 'Artemis III Orion', desc: 'First crewed lunar landing since Apollo. Targeting the Moon\'s south pole.' },
-  'ESCB': { full: 'ExoMars Rosalind Franklin', short: 'ExoMars', desc: 'ESA/Roscosmos Mars rover. Searching for signs of life on Mars.' },
-  'EURC': { full: 'Europa Clipper', desc: 'NASA mission to investigate Jupiter\'s moon Europa. Launched Oct 2024, arriving ~2030.' },
-  'GAIA': { full: 'Gaia', desc: 'ESA space observatory mapping a billion stars in the Milky Way. Launched 2013.' },
-  'GRAIL': { full: 'GRAIL', desc: 'Mapped the Moon\'s gravitational field. Mission ended 2012.' },
-  'HST': { full: 'Hubble Space Telescope', short: 'Hubble', desc: 'Iconic optical telescope in low Earth orbit. Revolutionizing astronomy since 1990.' },
-  'ICESAT2': { full: 'ICESat-2', desc: 'Measures ice sheet elevation changes, sea ice, and vegetation canopy height.' },
-  'JNO': { full: 'Juno', desc: 'Orbiting Jupiter studying its atmosphere, magnetosphere, and interior. Launched 2011.' },
-  'JWST': { full: 'James Webb Space Telescope', short: 'JWST', desc: 'Infrared space telescope at L2. The most powerful telescope ever built. Launched 2021.' },
-  'KPLO': { full: 'Korea Pathfinder Lunar Orbiter', short: 'KPLO Danuri', desc: 'South Korea\'s first lunar mission. Orbiting the Moon since 2022.' },
-  'LADEE': { full: 'LADEE', desc: 'Studied the Moon\'s thin atmosphere and dust environment. Mission ended 2014.' },
-  'LRO': { full: 'Lunar Reconnaissance Orbiter', short: 'LRO', desc: 'Mapping the Moon\'s surface in detail since 2009. Supports future lunar exploration.' },
-  'LUCY': { full: 'Lucy', desc: 'Visiting Jupiter\'s Trojan asteroids. First mission to these primitive bodies.' },
-  'M01O': { full: 'Mars Odyssey', desc: 'Orbiting Mars since 2001. Studies minerals, radiation, and relays data from surface rovers.' },
-  'M20': { full: 'Perseverance Rover', desc: 'Exploring Jezero Crater on Mars. Collecting samples for future Earth return. Landed Feb 2021.' },
-  'MAVEN': { full: 'MAVEN', desc: 'Mars Atmosphere and Volatile Evolution. Studies how Mars lost its atmosphere.' },
-  'MEX': { full: 'Mars Express', desc: 'ESA\'s first Mars mission. Orbiting since 2003 studying the surface, subsurface, and atmosphere.' },
-  'MMS': { full: 'MMS', desc: 'Magnetospheric Multiscale Mission studying magnetic reconnection around Earth.' },
-  'MRO': { full: 'Mars Reconnaissance Orbiter', short: 'MRO', desc: 'High-resolution imaging of Mars since 2006. Key relay satellite for surface missions.' },
-  'MSL': { full: 'Curiosity Rover', desc: 'Exploring Gale Crater on Mars since 2012. Found ancient habitable environments.' },
-  'MVN': { full: 'MAVEN', desc: 'Studying the Martian upper atmosphere and solar wind interaction.' },
-  'NHPC': { full: 'New Horizons', desc: 'First spacecraft to visit Pluto (2015). Now exploring the Kuiper Belt.' },
-  'NSYT': { full: 'InSight Lander', desc: 'Studied the interior of Mars. Mission ended Dec 2022.' },
-  'OSIRIS-APEX': { full: 'OSIRIS-APEX', desc: 'Extended mission heading to asteroid Apophis. Arriving 2029.' },
-  'OSRS': { full: 'OSIRIS-REx', desc: 'Returned samples from asteroid Bennu in Sep 2023. Now OSIRIS-APEX.' },
-  'PSYC': { full: 'Psyche', desc: 'Heading to metal asteroid 16 Psyche. Launched Oct 2023, arriving Aug 2029.' },
-  'SOHO': { full: 'SOHO', desc: 'Solar and Heliospheric Observatory at L1. Watching the Sun since 1995.' },
-  'SPP': { full: 'Parker Solar Probe', desc: 'Flying through the Sun\'s corona. The fastest human-made object ever built.' },
-  'STER-A': { full: 'STEREO-A', desc: 'Solar observatory providing 3D views of the Sun. Launched 2006.' },
-  'STA': { full: 'STEREO-A', desc: 'Solar observatory providing 3D views of the Sun. Launched 2006.' },
-  'TESS': { full: 'TESS', desc: 'Transiting Exoplanet Survey Satellite. Hunting for planets around nearby stars.' },
-  'TGO': { full: 'ExoMars TGO', desc: 'ESA\'s Trace Gas Orbiter at Mars. Searching for methane and relaying data.' },
-  'THB': { full: 'THEMIS-B', desc: 'Studying the magnetosphere and aurora from lunar orbit.' },
-  'THC': { full: 'THEMIS-C', desc: 'Studying the magnetosphere and aurora from lunar orbit.' },
-  'TDR5': { full: 'TDRS-5', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TDR6': { full: 'TDRS-6', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TDR7': { full: 'TDRS-7', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TDR8': { full: 'TDRS-8', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TDR9': { full: 'TDRS-9', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TDRS': { full: 'TDRS', desc: 'Tracking and Data Relay Satellite. NASA\'s constellation for space-to-ground communication.' },
-  'TD10': { full: 'TDRS-10', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TD11': { full: 'TDRS-11', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TD12': { full: 'TDRS-12', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'TD13': { full: 'TDRS-13', desc: 'Tracking and Data Relay Satellite. Relays data between spacecraft and ground stations.' },
-  'VGR1': { full: 'Voyager 1', desc: 'The most distant human-made object. Over 24 billion km from Earth. Launched 1977.' },
-  'VGR2': { full: 'Voyager 2', desc: 'Exploring interstellar space. The only spacecraft to visit Uranus and Neptune. Launched 1977.' },
-  'WIND': { full: 'Wind', desc: 'Studies the solar wind upstream of Earth. Operating since 1994.' },
-  'XMM': { full: 'XMM-Newton', desc: 'ESA\'s X-ray space telescope. Studying black holes, neutron stars, and galaxy clusters since 1999.' },
-};
+// ── Spacecraft Names ─────────────────────────────────────────────────
+// Dynamically populated from Worker (sourced from NASA's config.xml)
+// Fallback names used only for embedded snapshot
+let spacecraftNames = {};
 
 // ── Worker endpoint ──────────────────────────────────────────────────
 // Update this after deploying the Cloudflare Worker
@@ -491,6 +435,11 @@ function parseDSN(xml) {
 
 // ── JSON Parser (for Worker endpoint) ────────────────────────────────
 function parseDSNJSON(data) {
+  // Merge spacecraft names from Worker (sourced from NASA's config.xml)
+  if (data.spacecraft) {
+    Object.assign(spacecraftNames, data.spacecraft);
+  }
+
   const positions = getStationPositions();
   const newConnections = [];
 
@@ -663,7 +612,7 @@ function draw(t) {
     ctx.stroke();
 
     // Spacecraft dot
-    const scInfo = SPACECRAFT[c.scId];
+    const scName = spacecraftNames[c.scId];
     const dotR = active ? 3 : 2;
     ctx.beginPath();
     ctx.arc(c.renderX, c.renderY, dotR, 0, Math.PI * 2);
@@ -671,7 +620,7 @@ function draw(t) {
     ctx.fill();
 
     // Spacecraft label
-    const label = scInfo ? (scInfo.short || scInfo.full) : c.scId;
+    const label = scName || c.scId;
     ctx.font = '9px "IBM Plex Mono"';
     ctx.fillStyle = active ? 'rgba(200,214,229,0.6)' : 'rgba(74,85,104,0.4)';
     ctx.textAlign = 'center';
@@ -749,8 +698,8 @@ function checkHover() {
   });
 
   if (found) {
-    const sc = SPACECRAFT[found.scId];
-    document.getElementById('tt-name').textContent = sc ? sc.full : found.scId;
+    const scName = spacecraftNames[found.scId];
+    document.getElementById('tt-name').textContent = scName || found.scId;
     document.getElementById('tt-meta').textContent = found.dish + ' \u2192 ' + found.station.name;
 
     let detail = '';
@@ -759,7 +708,7 @@ function checkHover() {
     if (found.dataRate > 0) detail += 'Data rate: ' + (found.dataRate / 1000).toFixed(1) + ' kb/s\n';
     detail += 'Band: ' + found.activity;
     document.getElementById('tt-detail').textContent = detail;
-    document.getElementById('tt-desc').textContent = sc ? sc.desc : 'Unknown spacecraft';
+    document.getElementById('tt-desc').textContent = '';
 
     tooltip.style.left = Math.min(mouseX + 16, W - 280) + 'px';
     tooltip.style.top = (mouseY - 20) + 'px';

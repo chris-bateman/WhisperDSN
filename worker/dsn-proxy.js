@@ -1,8 +1,11 @@
 // WhisperDSN — Cloudflare Worker
 // Proxies NASA's DSN XML feed as JSON with CORS headers
+// Merges spacecraft names from NASA's config.xml
 
 const DSN_URL = 'https://eyes.jpl.nasa.gov/dsn/data/dsn.xml';
-const CACHE_SECONDS = 5;
+const CONFIG_URL = 'https://eyes.nasa.gov/apps/dsn-now/config.xml';
+const DSN_CACHE_SECONDS = 5;
+const CONFIG_CACHE_SECONDS = 2592000; // 30 days
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,34 +13,41 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+// In-memory config cache (persists across requests within same isolate)
+let cachedConfig = null;
+let configFetchedAt = 0;
+
 export default {
   async fetch(request) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    // Check cache first
+    // Check edge cache first
     const cache = caches.default;
     const cacheKey = new Request(new URL('/', request.url).href, request);
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
 
     try {
-      const resp = await fetch(DSN_URL, {
-        headers: { 'User-Agent': 'WhisperDSN/1.0' },
-      });
+      // Fetch DSN data and config in parallel
+      const [dsnResp, spacecraft] = await Promise.all([
+        fetch(DSN_URL, { headers: { 'User-Agent': 'WhisperDSN/1.0' } }),
+        getSpacecraftConfig(),
+      ]);
 
-      if (!resp.ok) {
-        return jsonResponse({ error: 'DSN feed unavailable', status: resp.status }, 502);
+      if (!dsnResp.ok) {
+        return jsonResponse({ error: 'DSN feed unavailable', status: dsnResp.status }, 502);
       }
 
-      const xml = await resp.text();
+      const xml = await dsnResp.text();
       const data = parseXML(xml);
+      data.spacecraft = spacecraft;
+
       const response = jsonResponse(data, 200, {
-        'Cache-Control': `public, max-age=${CACHE_SECONDS}`,
+        'Cache-Control': `public, max-age=${DSN_CACHE_SECONDS}`,
       });
 
-      // Store in edge cache
       await cache.put(cacheKey, response.clone());
       return response;
     } catch (e) {
@@ -45,6 +55,44 @@ export default {
     }
   },
 };
+
+// Fetch and cache spacecraft names from NASA's config.xml
+async function getSpacecraftConfig() {
+  const now = Date.now();
+  if (cachedConfig && (now - configFetchedAt) < CONFIG_CACHE_SECONDS * 1000) {
+    return cachedConfig;
+  }
+
+  try {
+    const resp = await fetch(CONFIG_URL, {
+      headers: { 'User-Agent': 'WhisperDSN/1.0' },
+    });
+    if (resp.ok) {
+      const xml = await resp.text();
+      cachedConfig = parseConfig(xml);
+      configFetchedAt = now;
+      return cachedConfig;
+    }
+  } catch (e) {}
+
+  // Return whatever we had, or empty
+  return cachedConfig || {};
+}
+
+// Parse config.xml — extracts spacecraft ID → display name mapping
+function parseConfig(xml) {
+  const spacecraft = {};
+  const regex = /<spacecraft\s+([^>]+)\/?>|<spacecraft\s+([^>]+)>[^<]*<\/spacecraft>/g;
+  let match;
+  while ((match = regex.exec(xml)) !== null) {
+    const attrStr = match[1] || match[2];
+    const attrs = parseAttrs(attrStr);
+    if (attrs.name && attrs.friendlyName) {
+      spacecraft[attrs.name.toUpperCase()] = attrs.friendlyName;
+    }
+  }
+  return spacecraft;
+}
 
 function jsonResponse(data, status, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -58,16 +106,12 @@ function jsonResponse(data, status, extraHeaders = {}) {
 }
 
 // Lightweight XML parser for DSN feed
-// The XML structure is flat and predictable, so regex works fine within 10ms CPU
 function parseXML(xml) {
   const result = { timestamp: null, stations: [] };
 
-  // Extract timestamp
   const tsMatch = xml.match(/<timestamp>(\d+)<\/timestamp>/);
   if (tsMatch) result.timestamp = parseInt(tsMatch[1]);
 
-  // Split into station sections
-  // Each <station> tag is followed by its dishes until the next <station> or end
   const stationRegex = /<station\s+([^>]+)\/>/g;
   const stationMatches = [...xml.matchAll(stationRegex)];
 
@@ -79,14 +123,12 @@ function parseXML(xml) {
       dishes: [],
     };
 
-    // Get the XML between this station and the next (or end of dsn)
     const startIdx = stationMatches[si].index;
     const endIdx = si + 1 < stationMatches.length
       ? stationMatches[si + 1].index
       : xml.indexOf('</dsn>') !== -1 ? xml.indexOf('</dsn>') : xml.length;
     const section = xml.substring(startIdx, endIdx);
 
-    // Parse dishes in this section
     const dishRegex = /<dish\s+([^>]+)>([\s\S]*?)<\/dish>/g;
     let dishMatch;
     while ((dishMatch = dishRegex.exec(section)) !== null) {
@@ -98,7 +140,6 @@ function parseXML(xml) {
         targets: [],
       };
 
-      // Parse signals
       const upSignals = parseSignals(dishBody, 'upSignal');
       const downSignals = parseSignals(dishBody, 'downSignal');
 
@@ -111,7 +152,6 @@ function parseXML(xml) {
         return rate > max ? rate : max;
       }, 0);
 
-      // Parse targets
       const targetRegex = /<target\s+([^>]+)\/>/g;
       let targetMatch;
       while ((targetMatch = targetRegex.exec(dishBody)) !== null) {
@@ -120,7 +160,6 @@ function parseXML(xml) {
         const range = parseFloat(tAttrs.downlegRange) || -1;
         const rtlt = parseFloat(tAttrs.rtlt) || -1;
 
-        // Skip internal/test targets
         if (['DSN', 'DSS', 'GBRA', 'TEST', 'DOUG', 'SHAN'].includes(id)) continue;
         if (range <= 0) continue;
 
