@@ -374,6 +374,13 @@
     <span style="color:var(--muted)">Gray</span> — the dish is pointed but idle.</p>
     <h3>Light pulses</h3>
     <p>Click any spacecraft to send a pulse of light toward it. The pulse travels at proportional speed — a signal to the Moon arrives in about 1.3 seconds. A signal to Voyager takes over 23 hours. You can click multiple spacecraft to race them.</p>
+    <h3>Dish status</h3>
+    <p>Hover over a station to see what each dish is doing. Status comes directly from NASA's feed:</p>
+    <p><span style="color:var(--green)">Telemetry, Tracking, Command</span> — actively communicating with a spacecraft.<br>
+    <span style="color:var(--blue)">Engineering Sustaining</span> — dish is available and on standby.<br>
+    <span style="color:var(--gold)">Engineering Upgrades</span> — dish is being upgraded, temporarily offline.<br>
+    <span style="color:var(--red)">Antenna Maintenance</span> — scheduled or unplanned maintenance.<br>
+    <span style="color:var(--dim)">Other</span> — radar astronomy, calibration, or internal testing.</p>
     <h3>The map fills up over time</h3>
     <p>Spacecraft stay on screen for 24 hours after they were last tracked. As the Earth rotates and different stations pick up different targets, the sky fills with everything the DSN is talking to. Check back later and you'll see more.</p>
     <p class="about-footer">Built by <a href="https://chrisb.cloud" target="_blank">Chris Bateman</a>. Data from <a href="https://eyes.nasa.gov/apps/dsn-now/dsn.html" target="_blank">NASA/JPL DSN Now</a>.</p>
@@ -497,6 +504,26 @@ function formatLightTime(seconds) {
   if (seconds < 60) return seconds.toFixed(1) + 's';
   if (seconds < 3600) return (seconds / 60).toFixed(1) + ' min';
   return (seconds / 3600).toFixed(1) + ' hrs';
+}
+
+function dishStatusColor(activity, alpha) {
+  if (!activity) return `rgba(74,85,104,${alpha})`;
+  const a = activity.toLowerCase();
+  if (a.includes('telemetry') || a.includes('command')) return `rgba(106,191,138,${alpha})`;  // green — active
+  if (a.includes('sustaining')) return `rgba(91,143,185,${alpha})`;   // blue — standby
+  if (a.includes('upgrade')) return `rgba(212,162,106,${alpha})`;     // gold — upgrades
+  if (a.includes('maintenance')) return `rgba(224,112,112,${alpha})`; // red — maintenance
+  return `rgba(74,85,104,${alpha})`;  // dim — other
+}
+
+function dishStatusHex(activity) {
+  if (!activity) return '#4a5568';
+  const a = activity.toLowerCase();
+  if (a.includes('telemetry') || a.includes('command')) return '#6abf8a';
+  if (a.includes('sustaining')) return '#5b8fb9';
+  if (a.includes('upgrade')) return '#d4a26a';
+  if (a.includes('maintenance')) return '#e07070';
+  return '#4a5568';
 }
 
 function hashCode(s) {
@@ -880,6 +907,7 @@ function draw(t) {
   // Draw stations and dishes
   stationPositions.forEach(s => {
     const dishes = stationDishes[s.id] || [];
+    const info = stationInfo[s.id];
     const activeDishes = new Set(
       connections.filter(c => c.station.id === s.id && (c.hasActiveUp || c.hasActiveDown)).map(c => c.dish)
     );
@@ -893,13 +921,15 @@ function draw(t) {
       const active = activeDishes.has(dish);
       const num = dish.replace('DSS', '');
 
+      const activity = (info && info.dishActivity && info.dishActivity[dish]) || '';
+
       ctx.beginPath();
       ctx.arc(dx, dy, active ? 3 : 2, 0, Math.PI * 2);
-      ctx.fillStyle = active ? 'rgba(212,162,106,0.9)' : 'rgba(212,162,106,0.25)';
+      ctx.fillStyle = active ? 'rgba(106,191,138,0.9)' : dishStatusColor(activity, 0.5);
       ctx.fill();
 
       ctx.font = '9px "JetBrains Mono"';
-      ctx.fillStyle = active ? 'rgba(212,162,106,0.7)' : 'rgba(74,85,104,0.5)';
+      ctx.fillStyle = active ? 'rgba(106,191,138,0.7)' : dishStatusColor(activity, 0.4);
       ctx.textAlign = 'center';
       ctx.fillText(num, dx, dy + 14);
     });
@@ -911,7 +941,6 @@ function draw(t) {
     ctx.fillText(s.name, s.x, s.y + 26);
 
     // Location + local time
-    const info = stationInfo[s.id];
     let locLine = s.loc;
     if (info && info.tzOffset !== undefined) {
       const localMs = Date.now() + info.tzOffset;
@@ -1024,16 +1053,18 @@ function checkHover() {
     }
     document.getElementById('tt-meta').textContent = meta;
 
-    // Dish status
+    // Dish status (use innerHTML for colour coding)
     const dishes = stationDishes[s.id] || [];
     let detail = '';
     dishes.forEach(dish => {
       const activity = (info && info.dishActivity && info.dishActivity[dish]) || 'Unknown';
       const active = connections.some(c => c.station.id === s.id && c.dish === dish && (c.hasActiveUp || c.hasActiveDown));
       const num = dish.replace('DSS', '');
-      detail += num + ': ' + (active ? 'Active' : activity) + '\n';
+      const color = active ? '#6abf8a' : dishStatusHex(activity);
+      const label = active ? 'Active' : activity;
+      detail += '<span style="color:' + color + '">' + num + ': ' + label + '</span><br>';
     });
-    document.getElementById('tt-detail').textContent = detail.trim();
+    document.getElementById('tt-detail').innerHTML = detail;
 
     // Last tracked
     const seen = loadSeen();
