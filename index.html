@@ -779,30 +779,11 @@ function draw(t) {
     const x = lp.sx + (lp.tx - lp.sx) * progress;
     const y = lp.sy + (lp.ty - lp.sy) * progress;
 
-    // Glow
-    const grd = ctx.createRadialGradient(x, y, 0, x, y, 12);
-    grd.addColorStop(0, 'rgba(255,240,200,0.6)');
-    grd.addColorStop(0.5, 'rgba(212,162,106,0.15)');
-    grd.addColorStop(1, 'rgba(212,162,106,0)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(x - 12, y - 12, 24, 24);
-
-    // Core dot
+    // Clean bright dot, no glow
     ctx.beginPath();
-    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255,240,200,0.9)';
     ctx.fill();
-
-    // Trail
-    for (let i = 1; i <= 5; i++) {
-      const tp = Math.max(progress - 0.04 * i, 0);
-      const trx = lp.sx + (lp.tx - lp.sx) * tp;
-      const trY = lp.sy + (lp.ty - lp.sy) * tp;
-      ctx.beginPath();
-      ctx.arc(trx, trY, 1.5 - i * 0.2, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(212,162,106,${0.3 - i * 0.05})`;
-      ctx.fill();
-    }
 
     // Timer label — shows real light time elapsed
     const displayTime = (elapsed / 1000) * lp.timeScale;
@@ -821,13 +802,6 @@ function draw(t) {
 
   // Draw stations and dishes
   stationPositions.forEach(s => {
-    // Station glow (subtle, won't accumulate with fade-trail)
-    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 20);
-    grad.addColorStop(0, 'rgba(212,162,106,0.04)');
-    grad.addColorStop(1, 'rgba(212,162,106,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(s.x - 20, s.y - 20, 40, 40);
-
     // Draw individual dish dots
     const stationConns = connections.filter(c => c.station.id === s.id);
     const drawnDishes = new Set();
