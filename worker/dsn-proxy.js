@@ -155,6 +155,7 @@ function parseXML(xml) {
     const station = {
       id: stationAttrs.name || '',
       friendlyName: stationAttrs.friendlyName || '',
+      timeZoneOffset: parseInt(stationAttrs.timeZoneOffset) || 0,
       dishes: [],
     };
 

@@ -405,6 +405,7 @@ const WORKER_URL = 'https://dsn-proxy.chris-bateman.workers.dev/';
 
 // ── Station Dishes (populated from live feed) ────────────────────────
 let stationDishes = {};
+let stationInfo = {};   // { id: { tzOffset, dishActivity: { dishName: activity } } }
 
 // ── Canvas & State ───────────────────────────────────────────────────
 const canvas = document.getElementById('c');
@@ -581,8 +582,14 @@ function parseDSNJSON(data) {
     const stationPos = positions.find(p => p.id === station.id);
     if (!stationPos) return;
 
-    // Track all dishes at this station
+    // Track all dishes and station info
     stationDishes[station.id] = (station.dishes || []).map(d => d.name);
+    const dishActivity = {};
+    (station.dishes || []).forEach(d => { dishActivity[d.name] = d.activity || ''; });
+    stationInfo[station.id] = {
+      tzOffset: station.timeZoneOffset || 0,
+      dishActivity,
+    };
 
     (station.dishes || []).forEach(dish => {
       (dish.targets || []).forEach(target => {
@@ -897,14 +904,40 @@ function draw(t) {
       ctx.fillText(num, dx, dy + 14);
     });
 
-    // Station name and location (below the dish array)
+    // Station name
     ctx.font = '11px "JetBrains Mono"';
     ctx.fillStyle = '#c8d6e5';
     ctx.textAlign = 'center';
-    ctx.fillText(s.name, s.x, s.y + 24);
+    ctx.fillText(s.name, s.x, s.y + 26);
+
+    // Location + local time
+    const info = stationInfo[s.id];
+    let locLine = s.loc;
+    if (info && info.tzOffset !== undefined) {
+      const localMs = Date.now() + info.tzOffset;
+      const local = new Date(localMs);
+      const hh = String(local.getUTCHours()).padStart(2, '0');
+      const mm = String(local.getUTCMinutes()).padStart(2, '0');
+      locLine += '  ' + hh + ':' + mm;
+    }
     ctx.font = '8px "JetBrains Mono"';
     ctx.fillStyle = 'rgba(74,85,104,0.7)';
-    ctx.fillText(s.loc, s.x, s.y + 36);
+    ctx.fillText(locLine, s.x, s.y + 38);
+
+    // Last tracked spacecraft at this station
+    const seen = loadSeen();
+    const stationSeen = Object.entries(seen)
+      .filter(([, d]) => d.stationId === s.id)
+      .sort((a, b) => b[1].ts - a[1].ts);
+    if (stationSeen.length > 0 && !connections.some(c => c.station.id === s.id && (c.hasActiveUp || c.hasActiveDown))) {
+      const [lastId, lastData] = stationSeen[0];
+      const ago = Math.round((Date.now() - lastData.ts) / 60000);
+      const name = spacecraftNames[lastId] || lastId;
+      const agoStr = ago < 1 ? 'just now' : ago < 60 ? ago + 'm ago' : Math.round(ago / 60) + 'h ago';
+      ctx.font = '8px "JetBrains Mono"';
+      ctx.fillStyle = 'rgba(74,85,104,0.4)';
+      ctx.fillText('last: ' + name + ' ' + agoStr, s.x, s.y + 50);
+    }
   });
 
   checkHover();
