@@ -34,7 +34,7 @@
     cursor: crosshair;
   }
 
-  canvas { display: block; }
+  canvas { display: block; touch-action: manipulation; }
 
   .title-card {
     position: fixed;
@@ -315,13 +315,18 @@
     .title-card { top: 16px; left: 16px; }
     .title-card h1 { font-size: 18px; }
     .title-card .sub { font-size: 8px; }
-    .status-bar { top: 16px; right: 16px; }
-    .legend { bottom: 16px; left: 16px; }
-    .legend div { font-size: 8px; }
+    .status-bar { top: 56px; right: auto; left: 16px; text-align: left; }
+    .status-bar .active-count { font-size: 10px; }
+    .legend { bottom: 16px; left: 16px; display: flex; gap: 12px; }
+    .legend div { font-size: 0; margin-bottom: 0; gap: 0; }
+    .legend .dot { width: 8px; height: 8px; }
     .source-link { bottom: 16px; right: 16px; font-size: 8px; }
-    .light-counter { bottom: 34px; right: 16px; }
+    .light-counter { bottom: auto; top: 16px; right: 16px; }
     .light-counter .light-value { font-size: 11px; }
-    .audio-toggle { top: 60px; right: 16px; width: 28px; height: 28px; font-size: 14px; }
+    .audio-toggle { top: 50px; right: 16px; width: 28px; height: 28px; font-size: 14px; }
+    .about-panel { padding: 24px 20px; }
+    .sc-tooltip { max-width: 220px; }
+    .pulse-hint { font-size: 8px; bottom: 50px; }
   }
 </style>
 </head>
@@ -410,12 +415,18 @@ let stars = [];
 let mouseX = -1, mouseY = -1;
 let lightTarget = 0, lightDisplay = 0;
 let isMobile = false;
+let isShortScreen = false;
+let activeTooltipConn = null;
 
 function resize() {
   W = canvas.width = window.innerWidth;
   H = canvas.height = window.innerHeight;
   isMobile = W < 600;
+  isShortScreen = H < 500;
   initStarfield();
+  document.getElementById('pulse-hint').textContent =
+    isMobile ? 'tap a spacecraft to send a light pulse'
+             : 'click a spacecraft to send a light pulse';
 }
 window.addEventListener('resize', resize);
 resize();
@@ -724,8 +735,8 @@ function spawnParticles() {
 
 // ── Draw ─────────────────────────────────────────────────────────────
 function draw(t) {
-  // Clear with fade trail
-  ctx.fillStyle = 'rgba(5,7,10,0.15)';
+  // Full clear — no ghosting
+  ctx.fillStyle = '#05070a';
   ctx.fillRect(0, 0, W, H);
 
   // Starfield
@@ -784,19 +795,27 @@ function draw(t) {
     }
   });
 
-  // Draw particles
+  // Draw particles with short manual trail
   spawnParticles();
   particles = particles.filter(p => p.progress < 1);
   particles.forEach(p => {
     p.progress += p.speed;
-    const x = p.sx + (p.tx - p.sx) * p.progress;
-    const y = p.sy + (p.ty - p.sy) * p.progress;
-    const alpha = Math.sin(p.progress * Math.PI) * 0.8;
+    const baseAlpha = Math.sin(p.progress * Math.PI) * 0.8;
 
-    ctx.beginPath();
-    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha})`;
-    ctx.fill();
+    // Draw trail (3 fading dots behind the head)
+    for (let i = 3; i >= 0; i--) {
+      const tp = Math.max(p.progress - p.speed * i * 2, 0);
+      const x = p.sx + (p.tx - p.sx) * tp;
+      const y = p.sy + (p.ty - p.sy) * tp;
+      const a = baseAlpha * (1 - i * 0.25);
+      const r = 1.5 - i * 0.3;
+      if (a > 0 && r > 0) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a})`;
+        ctx.fill();
+      }
+    }
   });
 
   // Draw light pulses (multiple can race)
@@ -869,9 +888,29 @@ function draw(t) {
 
 // ── Hover / Tooltip ──────────────────────────────────────────────────
 function checkHover() {
+  if (mouseX < 0 && !activeTooltipConn) return;
+  // On mobile with an active tooltip, keep showing it without requiring mouseX
+  if (isMobile && activeTooltipConn) {
+    const c = activeTooltipConn;
+    const scName = spacecraftNames[c.scId];
+    document.getElementById('tt-name').textContent = scName || c.scId;
+    document.getElementById('tt-meta').textContent = c.dish + ' \u2192 ' + c.station.name;
+    let detail = '';
+    detail += 'Distance: ' + formatDistance(c.range) + '\n';
+    detail += 'Light time: ' + formatLightTime(c.rtlt) + '\n';
+    if (c.dataRate > 0) detail += 'Data rate: ' + (c.dataRate / 1000).toFixed(1) + ' kb/s\n';
+    detail += 'Band: ' + c.activity;
+    document.getElementById('tt-detail').textContent = detail;
+    document.getElementById('tt-desc').textContent = '';
+    tooltip.style.left = '50%';
+    tooltip.style.transform = 'translateX(-50%)';
+    tooltip.style.top = '70px';
+    tooltip.classList.add('visible');
+    return;
+  }
   if (mouseX < 0) return;
   let found = null;
-  let minDist = 20;
+  let minDist = isMobile ? 35 : 20;
 
   connections.forEach(c => {
     const dx = mouseX - c.renderX;
@@ -896,8 +935,15 @@ function checkHover() {
     document.getElementById('tt-detail').textContent = detail;
     document.getElementById('tt-desc').textContent = '';
 
-    tooltip.style.left = Math.min(mouseX + 16, W - 280) + 'px';
-    tooltip.style.top = (mouseY - 20) + 'px';
+    if (isMobile) {
+      tooltip.style.left = '50%';
+      tooltip.style.transform = 'translateX(-50%)';
+      tooltip.style.top = '70px';
+    } else {
+      tooltip.style.transform = 'none';
+      tooltip.style.left = Math.min(mouseX + 16, W - 280) + 'px';
+      tooltip.style.top = Math.max(mouseY - 20, 10) + 'px';
+    }
     tooltip.classList.add('visible');
   } else {
     tooltip.classList.remove('visible');
@@ -912,6 +958,58 @@ canvas.addEventListener('mouseleave', () => {
   mouseX = -1;
   tooltip.classList.remove('visible');
 });
+
+// ── Touch Events ────────────────────────────────────────────────────
+function findNearestSpacecraft(x, y, radius) {
+  let found = null;
+  let minDist = radius;
+  connections.forEach(c => {
+    const dx = x - c.renderX;
+    const dy = y - c.renderY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < minDist) {
+      minDist = d;
+      found = c;
+    }
+  });
+  return found;
+}
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  mouseX = touch.clientX;
+  mouseY = touch.clientY;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  mouseX = touch.clientX;
+  mouseY = touch.clientY;
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  const found = findNearestSpacecraft(mouseX, mouseY, 35);
+
+  if (found) {
+    // If tapping the same spacecraft that already has tooltip, fire a light pulse
+    if (activeTooltipConn && activeTooltipConn.scId === found.scId && activeTooltipConn.dish === found.dish) {
+      fireLightPulse(found);
+      activeTooltipConn = null;
+      tooltip.classList.remove('visible');
+    } else {
+      // First tap — show tooltip
+      activeTooltipConn = found;
+    }
+  } else {
+    // Tapped empty space — dismiss tooltip
+    activeTooltipConn = null;
+    tooltip.classList.remove('visible');
+  }
+  mouseX = -1;
+}, { passive: false });
 
 // ── Light Pulse — click to send a pulse at proportional light speed ──
 let lightPulses = [];
