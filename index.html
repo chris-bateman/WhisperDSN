@@ -993,6 +993,73 @@ function checkHover() {
     document.getElementById('tt-detail').textContent = detail;
     document.getElementById('tt-desc').textContent = '';
 
+    showTooltip();
+    return;
+  }
+
+  // Check station hover
+  const positions = getStationPositions();
+  let hoveredStation = null;
+  positions.forEach(s => {
+    const dx = mouseX - s.x;
+    const dy = mouseY - s.y;
+    if (Math.abs(dx) < 80 && dy > -20 && dy < 50) {
+      hoveredStation = s;
+    }
+  });
+
+  if (hoveredStation) {
+    const s = hoveredStation;
+    const info = stationInfo[s.id];
+    document.getElementById('tt-name').textContent = s.name;
+
+    // Local time
+    let meta = s.loc;
+    if (info && info.tzOffset !== undefined) {
+      const localMs = Date.now() + info.tzOffset;
+      const local = new Date(localMs);
+      const hh = String(local.getUTCHours()).padStart(2, '0');
+      const mm = String(local.getUTCMinutes()).padStart(2, '0');
+      meta += ' — ' + hh + ':' + mm + ' local';
+    }
+    document.getElementById('tt-meta').textContent = meta;
+
+    // Dish status
+    const dishes = stationDishes[s.id] || [];
+    let detail = '';
+    dishes.forEach(dish => {
+      const activity = (info && info.dishActivity && info.dishActivity[dish]) || 'Unknown';
+      const active = connections.some(c => c.station.id === s.id && c.dish === dish && (c.hasActiveUp || c.hasActiveDown));
+      const num = dish.replace('DSS', '');
+      detail += num + ': ' + (active ? 'Active' : activity) + '\n';
+    });
+    document.getElementById('tt-detail').textContent = detail.trim();
+
+    // Last tracked
+    const seen = loadSeen();
+    const stationSeen = Object.entries(seen)
+      .filter(([, d]) => d.stationId === s.id)
+      .sort((a, b) => b[1].ts - a[1].ts)
+      .slice(0, 3);
+    if (stationSeen.length > 0) {
+      const lastLines = stationSeen.map(([id, d]) => {
+        const ago = Math.round((Date.now() - d.ts) / 60000);
+        const name = spacecraftNames[id] || id;
+        const agoStr = ago < 1 ? 'just now' : ago < 60 ? ago + 'm ago' : Math.round(ago / 60) + 'h ago';
+        return name + ' — ' + agoStr;
+      });
+      document.getElementById('tt-desc').textContent = 'Recent: ' + lastLines.join(', ');
+    } else {
+      document.getElementById('tt-desc').textContent = '';
+    }
+
+    showTooltip();
+    return;
+  }
+
+  tooltip.classList.remove('visible');
+
+  function showTooltip() {
     if (isMobile) {
       tooltip.style.left = '50%';
       tooltip.style.transform = 'translateX(-50%)';
@@ -1003,8 +1070,6 @@ function checkHover() {
       tooltip.style.top = Math.max(mouseY - 20, 10) + 'px';
     }
     tooltip.classList.add('visible');
-  } else {
-    tooltip.classList.remove('visible');
   }
 }
 
