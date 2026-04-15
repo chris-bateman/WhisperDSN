@@ -702,6 +702,13 @@ function layoutConnections(newConnections) {
 
   connections = conns;
 
+  // Keep mobile tooltip reference in sync with new connection objects
+  if (activeTooltipConn) {
+    const match = conns.find(c => c.scId === activeTooltipConn.scId && c.dish === activeTooltipConn.dish);
+    activeTooltipConn = match || null;
+    if (!match) tooltip.classList.remove('visible');
+  }
+
   // Update active count
   const activeCount = conns.filter(c => c.hasActiveUp || c.hasActiveDown).length;
   document.getElementById('active-count').textContent = activeCount + ' active links';
@@ -859,26 +866,31 @@ function draw(t) {
 
   // Draw stations and dishes
   stationPositions.forEach(s => {
-    // Draw individual dish dots
+    // Draw individual dish dots (or a single station dot if no connections)
     const stationConns = connections.filter(c => c.station.id === s.id);
-    const drawnDishes = new Set();
-    stationConns.forEach(c => {
-      if (drawnDishes.has(c.dish)) return;
-      drawnDishes.add(c.dish);
-      const active = c.hasActiveUp || c.hasActiveDown;
-
-      // Dish dot
+    if (stationConns.length === 0) {
       ctx.beginPath();
-      ctx.arc(c.dishX, c.dishY, active ? 2.5 : 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = active ? 'rgba(212,162,106,0.8)' : 'rgba(212,162,106,0.3)';
-      ctx.fill();
-
-      // Dish label (tiny, below dish dot)
-      ctx.font = '7px "JetBrains Mono"';
+      ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(212,162,106,0.3)';
-      ctx.textAlign = 'center';
-      ctx.fillText(c.dish, c.dishX, c.dishY + 10);
-    });
+      ctx.fill();
+    } else {
+      const drawnDishes = new Set();
+      stationConns.forEach(c => {
+        if (drawnDishes.has(c.dish)) return;
+        drawnDishes.add(c.dish);
+        const active = c.hasActiveUp || c.hasActiveDown;
+
+        ctx.beginPath();
+        ctx.arc(c.dishX, c.dishY, active ? 2.5 : 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = active ? 'rgba(212,162,106,0.8)' : 'rgba(212,162,106,0.3)';
+        ctx.fill();
+
+        ctx.font = '7px "JetBrains Mono"';
+        ctx.fillStyle = 'rgba(212,162,106,0.3)';
+        ctx.textAlign = 'center';
+        ctx.fillText(c.dish, c.dishX, c.dishY + 10);
+      });
+    }
 
     // Station name and location (below the dish array)
     ctx.font = '11px "JetBrains Mono"';
