@@ -403,6 +403,13 @@ let spacecraftNames = {};
 // Update this after deploying the Cloudflare Worker
 const WORKER_URL = 'https://dsn-proxy.chris-bateman.workers.dev/';
 
+// ── Station Dishes (real DSN antenna arrays) ─────────────────────────
+const STATION_DISHES = {
+  'gdscc': ['DSS14', 'DSS24', 'DSS25', 'DSS26'],
+  'mdscc': ['DSS53', 'DSS54', 'DSS55', 'DSS56', 'DSS63', 'DSS65'],
+  'cdscc': ['DSS34', 'DSS35', 'DSS36', 'DSS43'],
+};
+
 // ── Canvas & State ───────────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -866,31 +873,29 @@ function draw(t) {
 
   // Draw stations and dishes
   stationPositions.forEach(s => {
-    // Draw individual dish dots (or a single station dot if no connections)
-    const stationConns = connections.filter(c => c.station.id === s.id);
-    if (stationConns.length === 0) {
+    const dishes = STATION_DISHES[s.id] || [];
+    const activeDishes = new Set(
+      connections.filter(c => c.station.id === s.id && (c.hasActiveUp || c.hasActiveDown)).map(c => c.dish)
+    );
+    const dishSpread = isMobile ? 20 : 30;
+    const n = dishes.length;
+
+    dishes.forEach((dish, i) => {
+      const offset = n > 1 ? ((i / (n - 1)) - 0.5) * dishSpread * 2 : 0;
+      const dx = s.x + offset;
+      const dy = s.y - 4;
+      const active = activeDishes.has(dish);
+
       ctx.beginPath();
-      ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(212,162,106,0.3)';
+      ctx.arc(dx, dy, active ? 2.5 : 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = active ? 'rgba(212,162,106,0.8)' : 'rgba(212,162,106,0.3)';
       ctx.fill();
-    } else {
-      const drawnDishes = new Set();
-      stationConns.forEach(c => {
-        if (drawnDishes.has(c.dish)) return;
-        drawnDishes.add(c.dish);
-        const active = c.hasActiveUp || c.hasActiveDown;
 
-        ctx.beginPath();
-        ctx.arc(c.dishX, c.dishY, active ? 2.5 : 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = active ? 'rgba(212,162,106,0.8)' : 'rgba(212,162,106,0.3)';
-        ctx.fill();
-
-        ctx.font = '7px "JetBrains Mono"';
-        ctx.fillStyle = 'rgba(212,162,106,0.3)';
-        ctx.textAlign = 'center';
-        ctx.fillText(c.dish, c.dishX, c.dishY + 10);
-      });
-    }
+      ctx.font = '7px "JetBrains Mono"';
+      ctx.fillStyle = 'rgba(212,162,106,0.3)';
+      ctx.textAlign = 'center';
+      ctx.fillText(dish, dx, dy + 10);
+    });
 
     // Station name and location (below the dish array)
     ctx.font = '11px "JetBrains Mono"';
