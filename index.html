@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhisperDSN — Deep Space Network Live</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Instrument+Serif&display=swap');
+
+  :root {
+    --void: #05070a;
+    --panel: #0a0f18;
+    --line: #111a2a;
+    --text: #c8d6e5;
+    --dim: #4a5568;
+    --muted: #2d3748;
+    --gold: #d4a26a;
+    --gold-glow: rgba(212,162,106,0.15);
+    --blue: #5b8fb9;
+    --blue-glow: rgba(91,143,185,0.12);
+    --green: #6abf8a;
+    --red: #e07070;
+    --red-glow: rgba(224,112,112,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  canvas { display: block; }
+
+  .title-card {
+    position: fixed;
+    top: 28px;
+    left: 32px;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .title-card h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--gold);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .title-card .sub {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .legend {
+    position: fixed;
+    bottom: 24px;
+    left: 32px;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .legend div {
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .dot-up { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+  .dot-down { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+  .dot-both { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot-idle { background: var(--muted); }
+
+  .station-label {
+    position: fixed;
+    z-index: 100;
+    pointer-events: none;
+    text-align: center;
+  }
+  .station-label .name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 1px;
+  }
+  .station-label .loc {
+    font-size: 8px;
+    color: var(--dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .sc-tooltip {
+    position: fixed;
+    z-index: 200;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 16px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    max-width: 260px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  }
+  .sc-tooltip.visible { opacity: 1; }
+  .sc-tooltip .sc-name {
+    font-family: 'Instrument Serif', serif;
+    font-size: 16px;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+  .sc-tooltip .sc-meta {
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .sc-tooltip .sc-detail {
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.6;
+    white-space: pre-line;
+  }
+  .sc-tooltip .sc-desc {
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  .status-bar {
+    position: fixed;
+    top: 28px;
+    right: 32px;
+    z-index: 100;
+    text-align: right;
+    pointer-events: none;
+  }
+  .status-bar .ts {
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+  .status-bar .active-count {
+    font-size: 11px;
+    color: var(--gold);
+    margin-top: 2px;
+  }
+
+  .source-link {
+    position: fixed;
+    bottom: 24px;
+    right: 32px;
+    z-index: 100;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .source-link a {
+    color: var(--dim);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .source-link a:hover { color: var(--gold); }
+
+  .light-counter {
+    position: fixed;
+    bottom: 42px;
+    right: 32px;
+    z-index: 100;
+    pointer-events: none;
+    text-align: right;
+  }
+  .light-counter .light-value {
+    font-size: 13px;
+    color: var(--dim);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .light-counter .light-label {
+    display: block;
+    font-size: 8px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  .audio-toggle {
+    position: fixed;
+    top: 80px;
+    right: 32px;
+    z-index: 100;
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--dim);
+    font-size: 16px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .audio-toggle:hover { color: var(--gold); border-color: var(--gold); }
+  .audio-toggle.active { color: var(--gold); border-color: var(--gold); }
+
+  @media (max-width: 600px) {
+    .title-card { top: 16px; left: 16px; }
+    .title-card h1 { font-size: 18px; }
+    .title-card .sub { font-size: 8px; }
+    .status-bar { top: 16px; right: 16px; }
+    .legend { bottom: 16px; left: 16px; }
+    .legend div { font-size: 8px; }
+    .source-link { bottom: 16px; right: 16px; font-size: 8px; }
+    .light-counter { bottom: 34px; right: 16px; }
+    .light-counter .light-value { font-size: 11px; }
+    .audio-toggle { top: 60px; right: 16px; width: 28px; height: 28px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="title-card">
+  <h1>WhisperDSN</h1>
+  <div class="sub">Deep Space Network — Live</div>
+</div>
+
+<div class="status-bar">
+  <div class="ts" id="timestamp">connecting...</div>
+  <div class="active-count" id="active-count"></div>
+</div>
+
+<div class="legend">
+  <div><span class="dot dot-up"></span>Transmitting to spacecraft</div>
+  <div><span class="dot dot-down"></span>Receiving from spacecraft</div>
+  <div><span class="dot dot-both"></span>Two-way link</div>
+  <div><span class="dot dot-idle"></span>Idle / maintenance</div>
+</div>
+
+<div class="light-counter">
+  <span class="light-value" id="light-value">0</span>
+  <span class="light-label">seconds of light travelling</span>
+</div>
+
+<div class="source-link">
+  <a href="https://eyes.nasa.gov/apps/dsn-now/dsn.html" target="_blank">data: nasa/jpl dsn</a>
+</div>
+
+<button class="audio-toggle" id="audio-toggle" title="Toggle ambient audio">&#9834;</button>
+
+<div class="sc-tooltip" id="tooltip">
+  <div class="sc-name" id="tt-name"></div>
+  <div class="sc-meta" id="tt-meta"></div>
+  <div class="sc-detail" id="tt-detail"></div>
+  <div class="sc-desc" id="tt-desc"></div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+// ── Spacecraft Database ──────────────────────────────────────────────
+const SPACECRAFT = {
+  'ACE': { full: 'Advanced Composition Explorer', desc: 'Studies solar wind and cosmic rays from the L1 Lagrange point. Launched 1997.' },
+  'AKTS': { full: 'Akatsuki', desc: 'JAXA Venus orbiter studying the planet\'s atmosphere and weather. Launched 2010.' },
+  'CAS': { full: 'Cassini', desc: 'Explored Saturn and its moons for 13 years. Mission ended 2017.' },
+  'CHDR': { full: 'Chandra X-ray Observatory', desc: 'Space telescope observing X-rays from hot regions of the universe. Launched 1999.' },
+  'CLPS': { full: 'CLPS Lander', desc: 'Commercial Lunar Payload Services delivery to the Moon\'s surface.' },
+  'DAVINCI': { full: 'DAVINCI', desc: 'NASA mission to study Venus\' atmosphere. Planned launch late 2020s.' },
+  'DSCO': { full: 'DSCOVR', desc: 'Deep Space Climate Observatory at L1. Monitors solar wind and photographs the sunlit Earth.' },
+  'EM1': { full: 'Artemis I Orion', desc: 'Uncrewed test flight of the Orion spacecraft around the Moon.' },
+  'EM2': { full: 'Artemis II Orion', desc: 'First crewed Artemis mission flying astronauts around the Moon.' },
+  'EM3': { full: 'Artemis III Orion', desc: 'First crewed lunar landing since Apollo. Targeting the Moon\'s south pole.' },
+  'ESCB': { full: 'ExoMars Rosalind Franklin', desc: 'ESA/Roscosmos Mars rover. Searching for signs of life on Mars.' },
+  'EURC': { full: 'Europa Clipper', desc: 'NASA mission to investigate Jupiter\'s moon Europa. Launched Oct 2024, arriving ~2030.' },
+  'GAIA': { full: 'Gaia', desc: 'ESA space observatory mapping a billion stars in the Milky Way. Launched 2013.' },
+  'GRAIL': { full: 'GRAIL', desc: 'Mapped the Moon\'s gravitational field. Mission ended 2012.' },
+  'HST': { full: 'Hubble Space Telescope', desc: 'Iconic optical telescope in low Earth orbit. Revolutionizing astronomy since 1990.' },
+  'ICESAT2': { full: 'ICESat-2', desc: 'Measures ice sheet elevation changes, sea ice, and vegetation canopy height.' },
+  'JNO': { full: 'Juno', desc: 'Orbiting Jupiter studying its atmosphere, magnetosphere, and interior. Launched 2011.' },
+  'JWST': { full: 'James Webb Space Telescope', desc: 'Infrared space telescope at L2. The most powerful telescope ever built. Launched 2021.' },
+  'KPLO': { full: 'Korea Pathfinder Lunar Orbiter', desc: 'South Korea\'s first lunar mission. Orbiting the Moon since 2022.' },
+  'LADEE': { full: 'LADEE', desc: 'Studied the Moon\'s thin atmosphere and dust environment. Mission ended 2014.' },
+  'LRO': { full: 'Lunar Reconnaissance Orbiter', desc: 'Mapping the Moon\'s surface in detail since 2009. Supports future lunar exploration.' },
+  'LUCY': { full: 'Lucy', desc: 'Visiting Jupiter\'s Trojan asteroids. First mission to these primitive bodies.' },
+  'M01O': { full: 'Mars Odyssey', desc: 'Orbiting Mars since 2001. Studies minerals, radiation, and relays data from surface rovers.' },
+  'M20': { full: 'Perseverance Rover', desc: 'Exploring Jezero Crater on Mars. Collecting samples for future Earth return. Landed Feb 2021.' },
+  'MAVEN': { full: 'MAVEN', desc: 'Mars Atmosphere and Volatile Evolution. Studies how Mars lost its atmosphere.' },
+  'MEX': { full: 'Mars Express', desc: 'ESA\'s first Mars mission. Orbiting since 2003 studying the surface, subsurface, and atmosphere.' },
+  'MMS': { full: 'MMS', desc: 'Magnetospheric Multiscale Mission studying magnetic reconnection around Earth.' },
+  'MRO': { full: 'Mars Reconnaissance Orbiter', desc: 'High-resolution imaging of Mars since 2006. Key relay satellite for surface missions.' },
+  'MSL': { full: 'Curiosity Rover', desc: 'Exploring Gale Crater on Mars since 2012. Found ancient habitable environments.' },
+  'MVN': { full: 'MAVEN', desc: 'Studying the Martian upper atmosphere and solar wind interaction.' },
+  'NHPC': { full: 'New Horizons', desc: 'First spacecraft to visit Pluto (2015). Now exploring the Kuiper Belt.' },
+  'NSYT': { full: 'InSight Lander', desc: 'Studied the interior of Mars. Mission ended Dec 2022.' },
+  'OSIRIS-APEX': { full: 'OSIRIS-APEX', desc: 'Extended mission heading to asteroid Apophis. Arriving 2029.' },
+  'OSRS': { full: 'OSIRIS-REx', desc: 'Returned samples from asteroid Bennu in Sep 2023. Now OSIRIS-APEX.' },
+  'PSYC': { full: 'Psyche', desc: 'Heading to metal asteroid 16 Psyche. Launched Oct 2023, arriving Aug 2029.' },
+  'SOHO': { full: 'SOHO', desc: 'Solar and Heliospheric Observatory at L1. Watching the Sun since 1995.' },
+  'SPP': { full: 'Parker Solar Probe', desc: 'Flying through the Sun\'s corona. The fastest human-made object ever built.' },
+  'STER-A': { full: 'STEREO-A', desc: 'Solar observatory providing 3D views of the Sun. Launched 2006.' },
+  'STA': { full: 'STEREO-A', desc: 'Solar observatory providing 3D views of the Sun. Launched 2006.' },
+  'TESS': { full: 'TESS', desc: 'Transiting Exoplanet Survey Satellite. Hunting for planets around nearby stars.' },
+  'TGO': { full: 'ExoMars TGO', desc: 'ESA\'s Trace Gas Orbiter at Mars. Searching for methane and relaying data.' },
+  'THB': { full: 'THEMIS-B', desc: 'Studying the magnetosphere and aurora from lunar orbit.' },
+  'THC': { full: 'THEMIS-C', desc: 'Studying the magnetosphere and aurora from lunar orbit.' },
+  'VGR1': { full: 'Voyager 1', desc: 'The most distant human-made object. Over 24 billion km from Earth. Launched 1977.' },
+  'VGR2': { full: 'Voyager 2', desc: 'Exploring interstellar space. The only spacecraft to visit Uranus and Neptune. Launched 1977.' },
+  'WIND': { full: 'Wind', desc: 'Studies the solar wind upstream of Earth. Operating since 1994.' },
+  'XMM': { full: 'XMM-Newton', desc: 'ESA\'s X-ray space telescope. Studying black holes, neutron stars, and galaxy clusters since 1999.' },
+};
+
+// ── Worker endpoint ──────────────────────────────────────────────────
+// Update this after deploying the Cloudflare Worker
+const WORKER_URL = 'https://dsn-proxy.chrisb.workers.dev/';
+
+// ── Canvas & State ───────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+let W, H;
+let connections = [];
+let particles = [];
+let stars = [];
+let mouseX = -1, mouseY = -1;
+let lightTarget = 0, lightDisplay = 0;
+let isMobile = false;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  isMobile = W < 600;
+  initStarfield();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Starfield ────────────────────────────────────────────────────────
+function initStarfield() {
+  const count = isMobile ? 100 : 200;
+  stars = [];
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.75,
+      brightness: 0.1 + Math.random() * 0.3,
+      twinkleSpeed: 0.0005 + Math.random() * 0.002,
+      twinklePhase: Math.random() * Math.PI * 2,
+    });
+  }
+}
+
+function drawStarfield(t) {
+  stars.forEach(s => {
+    const alpha = s.brightness * (0.5 + 0.5 * Math.sin(t * s.twinkleSpeed + s.twinklePhase));
+    ctx.fillStyle = `rgba(200,214,229,${alpha})`;
+    ctx.fillRect(s.x, s.y, 1, 1);
+  });
+}
+
+// ── Station Positions ────────────────────────────────────────────────
+function getStationPositions() {
+  if (isMobile) {
+    return [
+      { id: 'gdscc', name: 'Goldstone', loc: 'California, USA', x: W * 0.5, y: H * 0.72 },
+      { id: 'mdscc', name: 'Madrid', loc: 'Robledo, Spain', x: W * 0.5, y: H * 0.82 },
+      { id: 'cdscc', name: 'Canberra', loc: 'Tidbinbilla, Australia', x: W * 0.5, y: H * 0.92 },
+    ];
+  }
+  const y = H * 0.82;
+  return [
+    { id: 'gdscc', name: 'Goldstone', loc: 'California, USA', x: W * 0.2, y },
+    { id: 'mdscc', name: 'Madrid', loc: 'Robledo, Spain', x: W * 0.5, y },
+    { id: 'cdscc', name: 'Canberra', loc: 'Tidbinbilla, Australia', x: W * 0.8, y },
+  ];
+}
+
+// ── Formatting ───────────────────────────────────────────────────────
+function formatDistance(km) {
+  if (km < 0) return '—';
+  if (km < 1000) return km.toFixed(0) + ' km';
+  if (km < 1e6) return (km / 1e3).toFixed(0) + ',000 km';
+  if (km < 1e9) return (km / 1e6).toFixed(1) + 'M km';
+  return (km / 1e9).toFixed(2) + 'B km';
+}
+
+function formatLightTime(seconds) {
+  if (seconds < 0 || seconds === 0) return '—';
+  if (seconds < 60) return seconds.toFixed(1) + 's';
+  if (seconds < 3600) return (seconds / 60).toFixed(1) + ' min';
+  return (seconds / 3600).toFixed(1) + ' hrs';
+}
+
+function hashCode(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+// ── XML Parser (for embedded snapshot fallback) ──────────────────────
+function parseDSN(xml) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const dishEls = doc.querySelectorAll('dish');
+  const positions = getStationPositions();
+  const newConnections = [];
+
+  dishEls.forEach(dish => {
+    let prev = dish.previousElementSibling;
+    while (prev && prev.tagName !== 'station') prev = prev.previousElementSibling;
+    if (!prev) {
+      let node = dish;
+      while (node.previousElementSibling) {
+        node = node.previousElementSibling;
+        if (node.tagName === 'station') { prev = node; break; }
+      }
+    }
+    if (!prev) return;
+
+    const stationId = prev.getAttribute('name');
+    const stationPos = positions.find(p => p.id === stationId);
+    if (!stationPos) return;
+
+    const dishName = dish.getAttribute('name');
+    const activity = dish.getAttribute('activity');
+    const targets = dish.querySelectorAll('target');
+    const upSignals = dish.querySelectorAll('upSignal');
+    const downSignals = dish.querySelectorAll('downSignal');
+
+    const hasActiveUp = Array.from(upSignals).some(s => s.getAttribute('active') === 'true');
+    const hasActiveDown = Array.from(downSignals).some(s => s.getAttribute('active') === 'true');
+
+    targets.forEach(target => {
+      const scId = target.getAttribute('name');
+      if (['DSN', 'DSS', 'GBRA', 'TEST', 'DOUG', 'SHAN'].includes(scId)) return;
+
+      const range = parseFloat(target.getAttribute('downlegRange'));
+      const rtlt = parseFloat(target.getAttribute('rtlt'));
+      if (range <= 0) return;
+
+      const maxDataRate = Math.max(
+        ...Array.from(downSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0),
+        ...Array.from(upSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0)
+      );
+
+      newConnections.push({
+        station: stationPos, dish: dishName, scId, range, rtlt,
+        hasActiveUp, hasActiveDown, activity, dataRate: maxDataRate,
+        targetX: 0, targetY: 0, renderX: 0, renderY: 0,
+      });
+    });
+  });
+
+  const ts = doc.querySelector('timestamp');
+  if (ts) {
+    const d = new Date(parseInt(ts.textContent));
+    document.getElementById('timestamp').textContent = d.toUTCString().replace('GMT', 'UTC');
+  }
+
+  layoutConnections(newConnections);
+}
+
+// ── JSON Parser (for Worker endpoint) ────────────────────────────────
+function parseDSNJSON(data) {
+  const positions = getStationPositions();
+  const newConnections = [];
+
+  if (data.timestamp) {
+    const d = new Date(data.timestamp);
+    document.getElementById('timestamp').textContent = d.toUTCString().replace('GMT', 'UTC');
+  }
+
+  (data.stations || []).forEach(station => {
+    const stationPos = positions.find(p => p.id === station.id);
+    if (!stationPos) return;
+
+    (station.dishes || []).forEach(dish => {
+      (dish.targets || []).forEach(target => {
+        newConnections.push({
+          station: stationPos,
+          dish: dish.name,
+          scId: target.id,
+          range: target.downlegRange,
+          rtlt: target.rtlt,
+          hasActiveUp: target.upSignalActive,
+          hasActiveDown: target.downSignalActive,
+          activity: dish.activity,
+          dataRate: target.dataRate,
+          targetX: 0, targetY: 0, renderX: 0, renderY: 0,
+        });
+      });
+    });
+  });
+
+  layoutConnections(newConnections);
+}
+
+// ── Layout: dedup, position, smooth handoff ──────────────────────────
+function layoutConnections(newConnections) {
+  // Deduplicate — one entry per spacecraft, prefer active
+  const scMap = {};
+  newConnections.forEach(c => {
+    if (!scMap[c.scId] || (c.hasActiveUp || c.hasActiveDown)) {
+      scMap[c.scId] = c;
+    }
+  });
+
+  const conns = Object.values(scMap);
+  const maxRange = Math.max(...conns.map(c => c.range), 1);
+  const skyTop = H * (isMobile ? 0.04 : 0.06);
+  const skyBottom = H * (isMobile ? 0.45 : 0.55);
+
+  // Group by station for fan-out spreading
+  const byStation = {};
+  conns.forEach(c => {
+    const sid = c.station.id;
+    if (!byStation[sid]) byStation[sid] = [];
+    byStation[sid].push(c);
+  });
+
+  Object.values(byStation).forEach(group => {
+    group.sort((a, b) => a.range - b.range);
+    const n = group.length;
+    const stationX = group[0].station.x;
+    const spread = isMobile ? W * 0.8 : W * 0.25;
+
+    group.forEach((c, i) => {
+      // Vertical: log-scale distance
+      const logDist = Math.log10(Math.max(c.range, 100));
+      const maxLog = Math.log10(Math.max(maxRange, 100));
+      const yRatio = 1 - (logDist / maxLog);
+      c.targetY = skyTop + yRatio * (skyBottom - skyTop);
+
+      // Horizontal: even fan from station center
+      const slot = n > 1 ? (i / (n - 1)) - 0.5 : 0;
+      const hashJitter = ((hashCode(c.scId) % 50) / 50 - 0.5) * 30;
+      c.targetX = Math.min(W - 60, Math.max(60, stationX + slot * spread + hashJitter));
+    });
+  });
+
+  // Carry over render positions from previous frame for smooth interpolation
+  const prevMap = {};
+  connections.forEach(c => { prevMap[c.scId] = c; });
+
+  conns.forEach(c => {
+    const prev = prevMap[c.scId];
+    if (prev) {
+      c.renderX = prev.renderX;
+      c.renderY = prev.renderY;
+    } else {
+      c.renderX = c.targetX;
+      c.renderY = c.targetY;
+    }
+  });
+
+  connections = conns;
+
+  // Update active count
+  const activeCount = conns.filter(c => c.hasActiveUp || c.hasActiveDown).length;
+  document.getElementById('active-count').textContent = activeCount + ' active links';
+
+  // Update light travelling target
+  lightTarget = conns
+    .filter(c => c.hasActiveUp || c.hasActiveDown)
+    .reduce((sum, c) => sum + (c.rtlt > 0 ? c.rtlt / 2 : 0), 0);
+}
+
+// ── Particles ────────────────────────────────────────────────────────
+const MAX_LOG_RANGE = Math.log10(25e9); // ~Voyager distance
+
+function spawnParticles() {
+  connections.forEach(c => {
+    if (!c.hasActiveUp && !c.hasActiveDown) return;
+    if (Math.random() > 0.03) return;
+
+    const goingUp = c.hasActiveUp && (!c.hasActiveDown || Math.random() > 0.5);
+
+    // Speed scales inversely with log distance
+    const logRange = Math.log10(Math.max(c.range, 1000));
+    const speedFactor = Math.max(1 - (logRange / MAX_LOG_RANGE) * 0.85, 0.15);
+    const speed = (0.004 + Math.random() * 0.004) * speedFactor;
+
+    particles.push({
+      sx: goingUp ? c.station.x : c.renderX,
+      sy: goingUp ? c.station.y : c.renderY,
+      tx: goingUp ? c.renderX : c.station.x,
+      ty: goingUp ? c.renderY : c.station.y,
+      progress: 0,
+      speed,
+      r: goingUp ? 212 : 91,
+      g: goingUp ? 162 : 143,
+      b: goingUp ? 106 : 185,
+    });
+  });
+}
+
+// ── Draw ─────────────────────────────────────────────────────────────
+function draw(t) {
+  // Clear with fade trail
+  ctx.fillStyle = 'rgba(5,7,10,0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Starfield
+  drawStarfield(t);
+
+  // Smooth interpolation for all connections
+  connections.forEach(c => {
+    c.renderX += (c.targetX - c.renderX) * 0.05;
+    c.renderY += (c.targetY - c.renderY) * 0.05;
+  });
+
+  // Smooth light counter
+  lightDisplay += (lightTarget - lightDisplay) * 0.05;
+  document.getElementById('light-value').textContent = Math.round(lightDisplay).toLocaleString();
+
+  const stationPositions = getStationPositions();
+
+  // Draw connections
+  connections.forEach(c => {
+    const active = c.hasActiveUp || c.hasActiveDown;
+    ctx.beginPath();
+    ctx.moveTo(c.station.x, c.station.y);
+    ctx.lineTo(c.renderX, c.renderY);
+    if (active) {
+      const both = c.hasActiveUp && c.hasActiveDown;
+      ctx.strokeStyle = both ? 'rgba(106,191,138,0.08)' :
+                        c.hasActiveDown ? 'rgba(91,143,185,0.08)' :
+                        'rgba(212,162,106,0.08)';
+      ctx.lineWidth = 1;
+    } else {
+      ctx.strokeStyle = 'rgba(45,55,72,0.04)';
+      ctx.lineWidth = 0.5;
+    }
+    ctx.stroke();
+
+    // Spacecraft dot
+    const scInfo = SPACECRAFT[c.scId];
+    const dotR = active ? 3 : 2;
+    ctx.beginPath();
+    ctx.arc(c.renderX, c.renderY, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = active ? (c.hasActiveUp && c.hasActiveDown ? '#6abf8a' : c.hasActiveDown ? '#5b8fb9' : '#d4a26a') : '#2d3748';
+    ctx.fill();
+
+    // Spacecraft label
+    const label = scInfo ? scInfo.full : c.scId;
+    const shortLabel = label.length > 20 ? c.scId : label;
+    ctx.font = '9px "IBM Plex Mono"';
+    ctx.fillStyle = active ? 'rgba(200,214,229,0.6)' : 'rgba(74,85,104,0.4)';
+    ctx.textAlign = 'center';
+    ctx.fillText(shortLabel, c.renderX, c.renderY - 8);
+
+    // Distance label
+    if (active) {
+      ctx.font = '8px "IBM Plex Mono"';
+      ctx.fillStyle = 'rgba(74,85,104,0.5)';
+      ctx.fillText(formatDistance(c.range), c.renderX, c.renderY + 14);
+    }
+  });
+
+  // Draw particles
+  spawnParticles();
+  particles = particles.filter(p => p.progress < 1);
+  particles.forEach(p => {
+    p.progress += p.speed;
+    const x = p.sx + (p.tx - p.sx) * p.progress;
+    const y = p.sy + (p.ty - p.sy) * p.progress;
+    const alpha = Math.sin(p.progress * Math.PI) * 0.8;
+
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha})`;
+    ctx.fill();
+  });
+
+  // Draw stations
+  stationPositions.forEach(s => {
+    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 30);
+    grad.addColorStop(0, 'rgba(212,162,106,0.12)');
+    grad.addColorStop(1, 'rgba(212,162,106,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(s.x - 30, s.y - 30, 60, 60);
+
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#d4a26a';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(212,162,106,0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.font = '11px "IBM Plex Mono"';
+    ctx.fillStyle = '#c8d6e5';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.name, s.x, s.y + 24);
+    ctx.font = '8px "IBM Plex Mono"';
+    ctx.fillStyle = 'rgba(74,85,104,0.7)';
+    ctx.fillText(s.loc, s.x, s.y + 36);
+  });
+
+  checkHover();
+  requestAnimationFrame(draw);
+}
+
+// ── Hover / Tooltip ──────────────────────────────────────────────────
+function checkHover() {
+  if (mouseX < 0) return;
+  let found = null;
+  let minDist = 20;
+
+  connections.forEach(c => {
+    const dx = mouseX - c.renderX;
+    const dy = mouseY - c.renderY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < minDist) {
+      minDist = d;
+      found = c;
+    }
+  });
+
+  if (found) {
+    const sc = SPACECRAFT[found.scId];
+    document.getElementById('tt-name').textContent = sc ? sc.full : found.scId;
+    document.getElementById('tt-meta').textContent = found.dish + ' \u2192 ' + found.station.name;
+
+    let detail = '';
+    detail += 'Distance: ' + formatDistance(found.range) + '\n';
+    detail += 'Light time: ' + formatLightTime(found.rtlt) + '\n';
+    if (found.dataRate > 0) detail += 'Data rate: ' + (found.dataRate / 1000).toFixed(1) + ' kb/s\n';
+    detail += 'Band: ' + found.activity;
+    document.getElementById('tt-detail').textContent = detail;
+    document.getElementById('tt-desc').textContent = sc ? sc.desc : 'Unknown spacecraft';
+
+    tooltip.style.left = Math.min(mouseX + 16, W - 280) + 'px';
+    tooltip.style.top = (mouseY - 20) + 'px';
+    tooltip.classList.add('visible');
+  } else {
+    tooltip.classList.remove('visible');
+  }
+}
+
+canvas.addEventListener('mousemove', e => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+canvas.addEventListener('mouseleave', () => {
+  mouseX = -1;
+  tooltip.classList.remove('visible');
+});
+
+// ── Audio ────────────────────────────────────────────────────────────
+let audioCtx = null;
+let audioEnabled = false;
+let oscillators = {};
+
+const audioToggle = document.getElementById('audio-toggle');
+audioToggle.addEventListener('click', () => {
+  audioEnabled = !audioEnabled;
+  audioToggle.classList.toggle('active', audioEnabled);
+  if (audioEnabled) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    updateAudio();
+  } else {
+    stopAllAudio();
+  }
+});
+
+function updateAudio() {
+  if (!audioEnabled || !audioCtx) return;
+
+  const activeIds = new Set();
+  connections.forEach(c => {
+    if (!c.hasActiveUp && !c.hasActiveDown) return;
+    activeIds.add(c.scId);
+
+    if (!oscillators[c.scId]) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      gain.gain.value = 0;
+      osc.start();
+      oscillators[c.scId] = { osc, gain };
+    }
+
+    const logRange = Math.log10(Math.max(c.range, 1000));
+    const freq = 400 - (logRange / MAX_LOG_RANGE) * 340;
+    oscillators[c.scId].osc.frequency.setTargetAtTime(Math.max(freq, 60), audioCtx.currentTime, 0.1);
+    oscillators[c.scId].gain.gain.setTargetAtTime(0.03, audioCtx.currentTime, 0.3);
+  });
+
+  // Fade out removed connections
+  Object.keys(oscillators).forEach(id => {
+    if (!activeIds.has(id)) {
+      oscillators[id].gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+      const o = oscillators[id];
+      setTimeout(() => { o.osc.stop(); o.osc.disconnect(); o.gain.disconnect(); }, 1000);
+      delete oscillators[id];
+    }
+  });
+}
+
+function stopAllAudio() {
+  Object.values(oscillators).forEach(o => {
+    o.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    setTimeout(() => { o.osc.stop(); o.osc.disconnect(); o.gain.disconnect(); }, 500);
+  });
+  oscillators = {};
+}
+
+// ── Data Loading ─────────────────────────────────────────────────────
+const DSN_SNAPSHOT = `<dsn>
+<station name="gdscc" friendlyName="Goldstone" timeUTC="1772362932000" timeZoneOffset="-28800000.0"/>
+<dish name="DSS14" azimuthAngle="0" elevationAngle="90" windSpeed="" isMSPA="false" isArray="false" isDDOR="false" activity="Antenna Maintenance">
+<target name="DSS" id="99" uplegRange="-1" downlegRange="-1" rtlt="-1"/>
+</dish>
+<dish name="DSS24" azimuthAngle="81" elevationAngle="17" windSpeed="16" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="false" signalType="none" dataRate="0" frequency="0" band="S" power="0" spacecraft="CHDR" spacecraftID="-151"/>
+<downSignal active="false" signalType="none" dataRate="0" frequency="0" band="S" power="-150" spacecraft="CHDR" spacecraftID="-151"/>
+<target name="CHDR" id="151" uplegRange="101000" downlegRange="101000" rtlt="0.67"/>
+</dish>
+<dish name="DSS26" azimuthAngle="180" elevationAngle="90" windSpeed="16" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="false" signalType="none" dataRate="0" frequency="0" band="X" power="0" spacecraft="EURC" spacecraftID="-159"/>
+<downSignal active="false" signalType="none" dataRate="0" frequency="0" band="Ka" power="-160" spacecraft="EURC" spacecraftID="-159"/>
+<target name="EURC" id="159" uplegRange="280000000" downlegRange="280000000" rtlt="1870"/>
+</dish>
+<station name="mdscc" friendlyName="Madrid" timeUTC="1772362932000" timeZoneOffset="3600000.0"/>
+<dish name="DSS53" azimuthAngle="0" elevationAngle="90" windSpeed="" isMSPA="false" isArray="false" isDDOR="false" activity="Engineering Upgrades">
+<target name="DSN" id="99" uplegRange="-1" downlegRange="-1" rtlt="-1"/>
+</dish>
+<dish name="DSS63" azimuthAngle="167" elevationAngle="36" windSpeed="12" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="true" signalType="data" dataRate="0" frequency="0" band="X" power="9.9" spacecraft="M01O" spacecraftID="-53"/>
+<downSignal active="true" signalType="data" dataRate="66360" frequency="0" band="X" power="-130" spacecraft="M01O" spacecraftID="-53"/>
+<downSignal active="false" signalType="none" dataRate="0" frequency="0" band="X" power="-160" spacecraft="MEX" spacecraftID="-41"/>
+<target name="M01O" id="53" uplegRange="350000000" downlegRange="350000000" rtlt="2340"/>
+<target name="MEX" id="41" uplegRange="350000000" downlegRange="350000000" rtlt="2340"/>
+</dish>
+<dish name="DSS54" azimuthAngle="94" elevationAngle="90" windSpeed="10" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<downSignal active="false" signalType="none" dataRate="66360" frequency="0" band="X" power="-140" spacecraft="M01O" spacecraftID="-53"/>
+<downSignal active="false" signalType="none" dataRate="931500" frequency="0" band="X" power="-150" spacecraft="MRO" spacecraftID="-74"/>
+<upSignal active="false" signalType="none" dataRate="0" frequency="0" band="X" power="0" spacecraft="MRO" spacecraftID="-74"/>
+<target name="M01O" id="53" uplegRange="350000000" downlegRange="350000000" rtlt="2340"/>
+<target name="MRO" id="74" uplegRange="350000000" downlegRange="350000000" rtlt="2340"/>
+</dish>
+<dish name="DSS65" azimuthAngle="157" elevationAngle="34" windSpeed="12" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="true" signalType="data" dataRate="0" frequency="0" band="S" power="0.1" spacecraft="SOHO" spacecraftID="-21"/>
+<downSignal active="true" signalType="data" dataRate="245800" frequency="0" band="S" power="-120" spacecraft="SOHO" spacecraftID="-21"/>
+<target name="SOHO" id="21" uplegRange="1650000" downlegRange="1650000" rtlt="11"/>
+</dish>
+<dish name="DSS56" azimuthAngle="164" elevationAngle="32" windSpeed="12" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="true" signalType="data" dataRate="0" frequency="0" band="S" power="0.3" spacecraft="ACE" spacecraftID="-92"/>
+<downSignal active="true" signalType="data" dataRate="87650" frequency="0" band="S" power="-110" spacecraft="ACE" spacecraftID="-92"/>
+<target name="ACE" id="92" uplegRange="1480000" downlegRange="1480000" rtlt="9.86"/>
+</dish>
+<station name="cdscc" friendlyName="Canberra" timeUTC="1772362932000" timeZoneOffset="39600000.0"/>
+<dish name="DSS43" azimuthAngle="145" elevationAngle="47" windSpeed="0" isMSPA="false" isArray="false" isDDOR="false" activity="Science Radar Astronomy">
+<target name="GBRA" id="99" uplegRange="-1" downlegRange="-1" rtlt="-1"/>
+</dish>
+<dish name="DSS36" azimuthAngle="132" elevationAngle="70" windSpeed="0" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="true" signalType="data" dataRate="0" frequency="0" band="S" power="0.1" spacecraft="XMM" spacecraftID="-60"/>
+<downSignal active="true" signalType="data" dataRate="80660" frequency="0" band="S" power="-120" spacecraft="XMM" spacecraftID="-60"/>
+<target name="XMM" id="60" uplegRange="90100" downlegRange="90100" rtlt="0.6"/>
+</dish>
+<dish name="DSS35" azimuthAngle="57" elevationAngle="24" windSpeed="0" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="true" signalType="data" dataRate="0" frequency="0" band="X" power="0.2" spacecraft="ESCB" spacecraftID="-9"/>
+<downSignal active="true" signalType="data" dataRate="8000" frequency="0" band="X" power="-130" spacecraft="ESCB" spacecraftID="-9"/>
+<target name="ESCB" id="9" uplegRange="2000000" downlegRange="2000000" rtlt="13.3"/>
+</dish>
+<dish name="DSS34" azimuthAngle="20" elevationAngle="90" windSpeed="0" isMSPA="false" isArray="false" isDDOR="false" activity="Telemetry, Tracking, Command">
+<upSignal active="true" signalType="data" dataRate="0" frequency="0" band="S" power="0.2" spacecraft="LRO" spacecraftID="-85"/>
+<downSignal active="false" signalType="none" dataRate="0" frequency="0" band="K" power="-400" spacecraft="LRO" spacecraftID="-85"/>
+<downSignal active="false" signalType="none" dataRate="0" frequency="0" band="S" power="-480" spacecraft="LRO" spacecraftID="-85"/>
+<target name="LRO" id="85" uplegRange="373000" downlegRange="373000" rtlt="2.49"/>
+</dish>
+<timestamp>1772362932000</timestamp>
+</dsn>`;
+
+async function fetchDSN() {
+  // Try Worker endpoint first
+  try {
+    const resp = await fetch(WORKER_URL);
+    if (resp.ok) {
+      const data = await resp.json();
+      parseDSNJSON(data);
+      if (audioEnabled) updateAudio();
+      return;
+    }
+  } catch(e) {}
+
+  // Fallback: try NASA directly (will CORS-block in most browsers)
+  try {
+    const resp = await fetch('https://eyes.jpl.nasa.gov/dsn/data/dsn.xml');
+    if (resp.ok) {
+      const text = await resp.text();
+      parseDSN(text);
+      if (audioEnabled) updateAudio();
+      return;
+    }
+  } catch(e) {}
+
+  // Last resort: embedded snapshot
+  parseDSN(DSN_SNAPSHOT);
+  if (audioEnabled) updateAudio();
+}
+
+fetchDSN();
+setInterval(fetchDSN, 5000);
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
