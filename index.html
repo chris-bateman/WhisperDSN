@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WhisperDSN — Deep Space Network Live</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=DM+Serif+Display&display=swap');
 
   :root {
     --void: #05070a;
@@ -28,7 +28,7 @@
   body {
     background: var(--void);
     color: var(--text);
-    font-family: 'Space Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     height: 100vh;
     overflow: hidden;
     cursor: crosshair;
@@ -647,14 +647,14 @@ function draw(t) {
 
     // Spacecraft label
     const label = scName || c.scId;
-    ctx.font = '9px "IBM Plex Mono"';
+    ctx.font = '9px "JetBrains Mono"';
     ctx.fillStyle = active ? 'rgba(200,214,229,0.6)' : 'rgba(74,85,104,0.4)';
     ctx.textAlign = 'center';
     ctx.fillText(label, c.renderX, c.renderY - 8);
 
     // Distance label
     if (active) {
-      ctx.font = '8px "IBM Plex Mono"';
+      ctx.font = '8px "JetBrains Mono"';
       ctx.fillStyle = 'rgba(74,85,104,0.5)';
       ctx.fillText(formatDistance(c.range), c.renderX, c.renderY + 14);
     }
@@ -675,88 +675,55 @@ function draw(t) {
     ctx.fill();
   });
 
-  // Draw light pulse
-  if (lightPulse) {
-    const elapsed = performance.now() - lightPulse.startTime;
-    const progress = Math.min(elapsed / lightPulse.duration, 1);
-    const x = lightPulse.sx + (lightPulse.tx - lightPulse.sx) * progress;
-    const y = lightPulse.sy + (lightPulse.ty - lightPulse.sy) * progress;
+  // Draw light pulses (multiple can race)
+  lightPulses = lightPulses.filter(lp => {
+    const elapsed = performance.now() - lp.startTime;
+    const progress = Math.min(elapsed / lp.duration, 1);
 
-    // Bright pulse dot with glow
-    const pulseAlpha = progress < 1 ? 1 : 0;
-    if (pulseAlpha > 0) {
-      // Glow
-      const grd = ctx.createRadialGradient(x, y, 0, x, y, 12);
-      grd.addColorStop(0, 'rgba(255,240,200,0.6)');
-      grd.addColorStop(0.5, 'rgba(212,162,106,0.15)');
-      grd.addColorStop(1, 'rgba(212,162,106,0)');
-      ctx.fillStyle = grd;
-      ctx.fillRect(x - 12, y - 12, 24, 24);
+    if (progress >= 1) return false; // clean removal, no afterglow
 
-      // Core dot
+    const x = lp.sx + (lp.tx - lp.sx) * progress;
+    const y = lp.sy + (lp.ty - lp.sy) * progress;
+
+    // Glow
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, 12);
+    grd.addColorStop(0, 'rgba(255,240,200,0.6)');
+    grd.addColorStop(0.5, 'rgba(212,162,106,0.15)');
+    grd.addColorStop(1, 'rgba(212,162,106,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(x - 12, y - 12, 24, 24);
+
+    // Core dot
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,240,200,0.9)';
+    ctx.fill();
+
+    // Trail
+    for (let i = 1; i <= 5; i++) {
+      const tp = Math.max(progress - 0.04 * i, 0);
+      const trx = lp.sx + (lp.tx - lp.sx) * tp;
+      const trY = lp.sy + (lp.ty - lp.sy) * tp;
       ctx.beginPath();
-      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,240,200,0.9)';
+      ctx.arc(trx, trY, 1.5 - i * 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(212,162,106,${0.3 - i * 0.05})`;
       ctx.fill();
-
-      // Trail
-      const trailLen = 0.04;
-      for (let i = 1; i <= 5; i++) {
-        const tp = Math.max(progress - trailLen * i, 0);
-        const tx = lightPulse.sx + (lightPulse.tx - lightPulse.sx) * tp;
-        const ty = lightPulse.sy + (lightPulse.ty - lightPulse.sy) * tp;
-        ctx.beginPath();
-        ctx.arc(tx, ty, 1.5 - i * 0.2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(212,162,106,${0.3 - i * 0.05})`;
-        ctx.fill();
-      }
-
-      // Timer label — shows elapsed light time
-      const displayTime = (elapsed / 1000) * lightPulse.timeScale;
-      let timeStr;
-      if (displayTime < 60) timeStr = displayTime.toFixed(1) + 's';
-      else if (displayTime < 3600) timeStr = (displayTime / 60).toFixed(1) + ' min';
-      else timeStr = (displayTime / 3600).toFixed(1) + ' hrs';
-
-      ctx.font = '10px "IBM Plex Mono"';
-      ctx.fillStyle = 'rgba(212,162,106,0.8)';
-      ctx.textAlign = 'center';
-      ctx.fillText(timeStr, x, y - 16);
-
-      // Spacecraft name at target end
-      if (progress > 0.1) {
-        ctx.font = '8px "IBM Plex Mono"';
-        ctx.fillStyle = 'rgba(212,162,106,0.4)';
-        ctx.fillText(lightPulse.name, lightPulse.tx, lightPulse.ty - 20);
-      }
     }
 
-    // Arrival flash
-    if (progress >= 1) {
-      const fadeTime = elapsed - lightPulse.duration;
-      const fadeAlpha = Math.max(1 - fadeTime / 1500, 0);
-      if (fadeAlpha > 0) {
-        const grd = ctx.createRadialGradient(lightPulse.tx, lightPulse.ty, 0, lightPulse.tx, lightPulse.ty, 20 + (1 - fadeAlpha) * 10);
-        grd.addColorStop(0, `rgba(255,240,200,${fadeAlpha * 0.5})`);
-        grd.addColorStop(1, 'rgba(255,240,200,0)');
-        ctx.fillStyle = grd;
-        ctx.fillRect(lightPulse.tx - 30, lightPulse.ty - 30, 60, 60);
+    // Timer label — shows real light time elapsed
+    const displayTime = (elapsed / 1000) * lp.timeScale;
+    let timeStr;
+    if (displayTime < 60) timeStr = displayTime.toFixed(1) + 's';
+    else if (displayTime < 3600) timeStr = (displayTime / 60).toFixed(1) + ' min';
+    else timeStr = (displayTime / 3600).toFixed(1) + ' hrs';
 
-        // Final time
-        const totalTime = lightPulse.owlt;
-        let finalStr;
-        if (totalTime < 60) finalStr = totalTime.toFixed(1) + 's';
-        else if (totalTime < 3600) finalStr = (totalTime / 60).toFixed(1) + ' min';
-        else finalStr = (totalTime / 3600).toFixed(1) + ' hrs';
-        ctx.font = '11px "IBM Plex Mono"';
-        ctx.fillStyle = `rgba(212,162,106,${fadeAlpha})`;
-        ctx.textAlign = 'center';
-        ctx.fillText(finalStr + ' — arrived', lightPulse.tx, lightPulse.ty - 20);
-      } else {
-        lightPulse = null;
-      }
-    }
-  }
+    ctx.font = '10px "JetBrains Mono"';
+    ctx.fillStyle = 'rgba(212,162,106,0.8)';
+    ctx.textAlign = 'center';
+    ctx.fillText(timeStr, x, y - 16);
+
+    return true;
+  });
 
   // Draw stations and dishes
   stationPositions.forEach(s => {
@@ -782,18 +749,18 @@ function draw(t) {
       ctx.fill();
 
       // Dish label (tiny, below dish dot)
-      ctx.font = '7px "IBM Plex Mono"';
+      ctx.font = '7px "JetBrains Mono"';
       ctx.fillStyle = 'rgba(212,162,106,0.3)';
       ctx.textAlign = 'center';
       ctx.fillText(c.dish, c.dishX, c.dishY + 10);
     });
 
     // Station name and location (below the dish array)
-    ctx.font = '11px "IBM Plex Mono"';
+    ctx.font = '11px "JetBrains Mono"';
     ctx.fillStyle = '#c8d6e5';
     ctx.textAlign = 'center';
     ctx.fillText(s.name, s.x, s.y + 24);
-    ctx.font = '8px "IBM Plex Mono"';
+    ctx.font = '8px "JetBrains Mono"';
     ctx.fillStyle = 'rgba(74,85,104,0.7)';
     ctx.fillText(s.loc, s.x, s.y + 36);
   });
@@ -849,7 +816,7 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 // ── Light Pulse — click to send a pulse at proportional light speed ──
-let lightPulse = null;
+let lightPulses = [];
 const MAX_PULSE_DURATION = 30; // cap animation at 30 real seconds
 let hintShown = false;
 
@@ -890,7 +857,7 @@ canvas.addEventListener('click', e => {
   // Speed scale factor (1.0 if real-time, >1 if compressed)
   const timeScale = owlt / duration;
 
-  lightPulse = {
+  lightPulses.push({
     sx: found.dishX,
     sy: found.dishY,
     tx: found.renderX,
@@ -901,7 +868,7 @@ canvas.addEventListener('click', e => {
     timeScale,
     scId: found.scId,
     name: spacecraftNames[found.scId] || found.scId,
-  };
+  });
 });
 
 // ── Audio ────────────────────────────────────────────────────────────
