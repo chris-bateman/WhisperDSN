@@ -1240,6 +1240,28 @@ function drawGame(t) {
     ctx.font = '20px "JetBrains Mono"';
     ctx.fillStyle = 'rgba(74,85,104,0.5)';
     ctx.fillText('\u2715', W - 30, 38);
+
+    // Touch control buttons
+    if (!gs.gameOver) {
+      const btns = gameBtnPositions();
+      const s = GAME_BTN_SIZE;
+      const r = 8;
+      [
+        { pos: btns.thrust, label: '\u25b2', active: gameTouches.thrust },
+        { pos: btns.fire,   label: '\u25cf', active: gameTouches.fire },
+      ].forEach(({ pos, label, active }) => {
+        ctx.beginPath();
+        ctx.roundRect(pos.x, pos.y, s, s, r);
+        ctx.fillStyle = active ? 'rgba(212,162,106,0.15)' : 'rgba(74,85,104,0.1)';
+        ctx.fill();
+        ctx.strokeStyle = active ? 'rgba(212,162,106,0.4)' : 'rgba(74,85,104,0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = active ? 'rgba(212,162,106,0.7)' : 'rgba(74,85,104,0.5)';
+        ctx.font = '18px "JetBrains Mono"';
+        ctx.fillText(label, pos.x + s / 2, pos.y + s / 2 + 6);
+      });
+    }
   }
 
   // Game over
@@ -1281,7 +1303,25 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { gameKeys[e.key] = false; });
 
-// Game touch input
+// Game touch input — dual-zone rotation + thrust/fire buttons
+const GAME_BTN_SIZE = 44;
+const GAME_BTN_GAP = 14;
+
+function gameBtnPositions() {
+  return {
+    thrust: { x: W - GAME_BTN_SIZE * 2 - GAME_BTN_GAP - 20, y: H - GAME_BTN_SIZE - 20 },
+    fire:   { x: W - GAME_BTN_SIZE - 20, y: H - GAME_BTN_SIZE - 20 },
+  };
+}
+
+function hitGameBtn(x, y) {
+  const btns = gameBtnPositions();
+  for (const [name, btn] of Object.entries(btns)) {
+    if (x >= btn.x && x <= btn.x + GAME_BTN_SIZE && y >= btn.y && y <= btn.y + GAME_BTN_SIZE) return name;
+  }
+  return null;
+}
+
 canvas.addEventListener('touchstart', e => {
   if (!gameState) return;
   e.preventDefault();
@@ -1295,10 +1335,11 @@ canvas.addEventListener('touchstart', e => {
       gameState.introTimer = 0;
       return;
     }
-    const zone = x < W / 3 ? 'left' : x > W * 2 / 3 ? 'right' : 'center';
-    if (zone === 'left') gameTouches.left = true;
-    else if (zone === 'right') gameTouches.right = true;
-    else { gameTouches.thrust = true; gameTouches.fire = true; }
+    const btn = hitGameBtn(x, y);
+    if (btn === 'thrust') gameTouches.thrust = true;
+    else if (btn === 'fire') gameTouches.fire = true;
+    else if (x < W / 2) gameTouches.left = true;
+    else gameTouches.right = true;
   }
 }, { passive: false });
 
@@ -1307,11 +1348,12 @@ canvas.addEventListener('touchend', e => {
   e.preventDefault();
   gameTouches = {};
   for (const touch of e.touches) {
-    const x = touch.clientX;
-    const zone = x < W / 3 ? 'left' : x > W * 2 / 3 ? 'right' : 'center';
-    if (zone === 'left') gameTouches.left = true;
-    else if (zone === 'right') gameTouches.right = true;
-    else { gameTouches.thrust = true; gameTouches.fire = true; }
+    const x = touch.clientX, y = touch.clientY;
+    const btn = hitGameBtn(x, y);
+    if (btn === 'thrust') gameTouches.thrust = true;
+    else if (btn === 'fire') gameTouches.fire = true;
+    else if (x < W / 2) gameTouches.left = true;
+    else gameTouches.right = true;
   }
 }, { passive: false });
 
