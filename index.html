@@ -435,12 +435,14 @@ let lightTarget = 0, lightDisplay = 0;
 let isMobile = false;
 let isShortScreen = false;
 let activeTooltipConn = null;
+let stationPositions = [];
 
 function resize() {
   W = canvas.width = window.innerWidth;
   H = canvas.height = window.innerHeight;
   isMobile = W < 600;
   isShortScreen = H < 500;
+  stationPositions = getStationPositions();
   initStarfield();
   document.getElementById('pulse-hint').textContent =
     isMobile ? 'tap a spacecraft to send a light pulse'
@@ -506,6 +508,14 @@ function formatDistance(km) {
   return (km / 1e9).toFixed(2) + 'B km';
 }
 
+function connectionDetail(c) {
+  let d = 'Distance: ' + formatDistance(c.range) + '\n';
+  d += 'Light time: ' + formatLightTime(c.rtlt) + '\n';
+  if (c.dataRate > 0) d += 'Data rate: ' + (c.dataRate / 1000).toFixed(1) + ' kb/s\n';
+  d += 'Band: ' + c.activity;
+  return d;
+}
+
 function formatLightTime(seconds) {
   if (seconds < 0 || seconds === 0) return '—';
   if (seconds < 60) return seconds.toFixed(1) + 's';
@@ -513,24 +523,16 @@ function formatLightTime(seconds) {
   return (seconds / 3600).toFixed(1) + ' hrs';
 }
 
-function dishStatusColor(activity, alpha) {
-  if (!activity) return `rgba(74,85,104,${alpha})`;
-  const a = activity.toLowerCase();
-  if (a.includes('telemetry') || a.includes('command')) return `rgba(106,191,138,${alpha})`;  // green — active
-  if (a.includes('sustaining')) return `rgba(91,143,185,${alpha})`;   // blue — standby
-  if (a.includes('upgrade')) return `rgba(212,162,106,${alpha})`;     // gold — upgrades
-  if (a.includes('maintenance')) return `rgba(224,112,112,${alpha})`; // red — maintenance
-  return `rgba(74,85,104,${alpha})`;  // dim — other
-}
-
-function dishStatusHex(activity) {
-  if (!activity) return '#4a5568';
-  const a = activity.toLowerCase();
-  if (a.includes('telemetry') || a.includes('command')) return '#6abf8a';
-  if (a.includes('sustaining')) return '#5b8fb9';
-  if (a.includes('upgrade')) return '#d4a26a';
-  if (a.includes('maintenance')) return '#e07070';
-  return '#4a5568';
+function dishColor(activity, alpha) {
+  const rgb = !activity ? '74,85,104'
+    : (a => a.includes('telemetry') || a.includes('command') ? '106,191,138'
+    : a.includes('sustaining') ? '91,143,185'
+    : a.includes('upgrade') ? '212,162,106'
+    : a.includes('maintenance') ? '224,112,112'
+    : '74,85,104')(activity.toLowerCase());
+  if (alpha !== undefined) return `rgba(${rgb},${alpha})`;
+  const [r, g, b] = rgb.split(',');
+  return '#' + [r, g, b].map(v => (+v).toString(16).padStart(2, '0')).join('');
 }
 
 function hashCode(s) {
@@ -544,7 +546,6 @@ function parseDSN(xml) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, 'text/xml');
   const dishEls = doc.querySelectorAll('dish');
-  const positions = getStationPositions();
   const newConnections = [];
 
   dishEls.forEach(dish => {
@@ -560,7 +561,7 @@ function parseDSN(xml) {
     if (!prev) return;
 
     const stationId = prev.getAttribute('name');
-    const stationPos = positions.find(p => p.id === stationId);
+    const stationPos = stationPositions.find(p => p.id === stationId);
     if (!stationPos) return;
 
     const dishName = dish.getAttribute('name');
@@ -604,7 +605,6 @@ function parseDSN(xml) {
 
 // ── JSON Parser (for Worker endpoint) ────────────────────────────────
 function parseDSNJSON(data) {
-  const positions = getStationPositions();
   const newConnections = [];
 
   if (data.timestamp) {
@@ -613,7 +613,7 @@ function parseDSNJSON(data) {
   }
 
   (data.stations || []).forEach(station => {
-    const stationPos = positions.find(p => p.id === station.id);
+    const stationPos = stationPositions.find(p => p.id === station.id);
     if (!stationPos) return;
 
     // Track all dishes and station info
@@ -651,7 +651,6 @@ function layoutConnections(newConnections) {
   // Save current connections to the last-seen cache
   const seen = loadSeen();
   const now = Date.now();
-  const positions = getStationPositions();
   newConnections.forEach(c => {
     seen[c.scId] = {
       ts: now, range: c.range, rtlt: c.rtlt,
@@ -666,7 +665,7 @@ function layoutConnections(newConnections) {
   const activeIds = new Set(newConnections.map(c => c.scId));
   Object.entries(seen).forEach(([scId, data]) => {
     if (activeIds.has(scId)) return;
-    const stationPos = positions.find(p => p.id === data.stationId);
+    const stationPos = stationPositions.find(p => p.id === data.stationId);
     if (!stationPos) return;
     newConnections.push({
       station: stationPos, dish: data.dish, scId,
@@ -1347,8 +1346,6 @@ function draw(t) {
   lightDisplay += (lightTarget - lightDisplay) * 0.05;
   document.getElementById('light-value').textContent = Math.round(lightDisplay).toLocaleString();
 
-  const stationPositions = getStationPositions();
-
   // Draw connections (lines from dish positions to spacecraft)
   connections.forEach(c => {
     const active = c.hasActiveUp || c.hasActiveDown;
@@ -1465,11 +1462,11 @@ function draw(t) {
 
       ctx.beginPath();
       ctx.arc(dx, dy, active ? 3 : 2, 0, Math.PI * 2);
-      ctx.fillStyle = active ? 'rgba(106,191,138,0.9)' : dishStatusColor(activity, 0.5);
+      ctx.fillStyle = active ? 'rgba(106,191,138,0.9)' : dishColor(activity, 0.5);
       ctx.fill();
 
       ctx.font = '9px "JetBrains Mono"';
-      ctx.fillStyle = active ? 'rgba(106,191,138,0.7)' : dishStatusColor(activity, 0.4);
+      ctx.fillStyle = active ? 'rgba(106,191,138,0.7)' : dishColor(activity, 0.4);
       ctx.textAlign = 'center';
       ctx.fillText(num, dx, dy + 14);
     });
@@ -1522,12 +1519,7 @@ function checkHover() {
     const scName = spacecraftNames[c.scId];
     document.getElementById('tt-name').textContent = scName || c.scId;
     document.getElementById('tt-meta').textContent = c.dish + ' \u2192 ' + c.station.name;
-    let detail = '';
-    detail += 'Distance: ' + formatDistance(c.range) + '\n';
-    detail += 'Light time: ' + formatLightTime(c.rtlt) + '\n';
-    if (c.dataRate > 0) detail += 'Data rate: ' + (c.dataRate / 1000).toFixed(1) + ' kb/s\n';
-    detail += 'Band: ' + c.activity;
-    document.getElementById('tt-detail').textContent = detail;
+    document.getElementById('tt-detail').textContent = connectionDetail(c);
     document.getElementById('tt-desc').textContent = '';
     tooltip.style.left = '50%';
     tooltip.style.transform = 'translateX(-50%)';
@@ -1554,12 +1546,7 @@ function checkHover() {
     document.getElementById('tt-name').textContent = scName || found.scId;
     document.getElementById('tt-meta').textContent = found.dish + ' \u2192 ' + found.station.name;
 
-    let detail = '';
-    detail += 'Distance: ' + formatDistance(found.range) + '\n';
-    detail += 'Light time: ' + formatLightTime(found.rtlt) + '\n';
-    if (found.dataRate > 0) detail += 'Data rate: ' + (found.dataRate / 1000).toFixed(1) + ' kb/s\n';
-    detail += 'Band: ' + found.activity;
-    document.getElementById('tt-detail').textContent = detail;
+    document.getElementById('tt-detail').textContent = connectionDetail(found);
     document.getElementById('tt-desc').textContent = '';
 
     showTooltip();
@@ -1567,9 +1554,8 @@ function checkHover() {
   }
 
   // Check station hover
-  const positions = getStationPositions();
   let hoveredStation = null;
-  positions.forEach(s => {
+  stationPositions.forEach(s => {
     const dx = mouseX - s.x;
     const dy = mouseY - s.y;
     if (Math.abs(dx) < 80 && dy > -20 && dy < 50) {
@@ -1600,7 +1586,7 @@ function checkHover() {
       const activity = (info && info.dishActivity && info.dishActivity[dish]) || 'Unknown';
       const active = connections.some(c => c.station.id === s.id && c.dish === dish && (c.hasActiveUp || c.hasActiveDown));
       const num = dish.replace('DSS', '');
-      const color = active ? '#6abf8a' : dishStatusHex(activity);
+      const color = active ? '#6abf8a' : dishColor(activity);
       const label = active ? 'Active' : activity;
       detail += '<span style="color:' + color + '">' + num + ': ' + label + '</span><br>';
     });
@@ -2046,7 +2032,10 @@ document.getElementById('about-overlay').addEventListener('click', e => {
 const SEEN_KEY = 'whisperdsn_seen';
 const SEEN_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+let _seenCache = null;
+
 function loadSeen() {
+  if (_seenCache) return _seenCache;
   try {
     const raw = localStorage.getItem(SEEN_KEY);
     if (!raw) return {};
@@ -2055,11 +2044,13 @@ function loadSeen() {
     Object.keys(data).forEach(k => {
       if (now - data[k].ts > SEEN_TTL) delete data[k];
     });
+    _seenCache = data;
     return data;
   } catch(e) { return {}; }
 }
 
 function saveSeen(seen) {
+  _seenCache = seen;
   try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch(e) {}
 }
 
