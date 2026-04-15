@@ -208,9 +208,7 @@ function parseXML(xml) {
         });
       }
 
-      if (dish.targets.length > 0) {
-        station.dishes.push(dish);
-      }
+      station.dishes.push(dish);
     }
 
     result.stations.push(station);

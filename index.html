@@ -403,12 +403,8 @@ let spacecraftNames = {};
 // Update this after deploying the Cloudflare Worker
 const WORKER_URL = 'https://dsn-proxy.chris-bateman.workers.dev/';
 
-// ── Station Dishes (real DSN antenna arrays) ─────────────────────────
-const STATION_DISHES = {
-  'gdscc': ['DSS14', 'DSS24', 'DSS25', 'DSS26'],
-  'mdscc': ['DSS53', 'DSS54', 'DSS55', 'DSS56', 'DSS63', 'DSS65'],
-  'cdscc': ['DSS34', 'DSS35', 'DSS36', 'DSS43'],
-};
+// ── Station Dishes (populated from live feed) ────────────────────────
+let stationDishes = {};
 
 // ── Canvas & State ───────────────────────────────────────────────────
 const canvas = document.getElementById('c');
@@ -584,6 +580,9 @@ function parseDSNJSON(data) {
   (data.stations || []).forEach(station => {
     const stationPos = positions.find(p => p.id === station.id);
     if (!stationPos) return;
+
+    // Track all dishes at this station
+    stationDishes[station.id] = (station.dishes || []).map(d => d.name);
 
     (station.dishes || []).forEach(dish => {
       (dish.targets || []).forEach(target => {
@@ -873,7 +872,7 @@ function draw(t) {
 
   // Draw stations and dishes
   stationPositions.forEach(s => {
-    const dishes = STATION_DISHES[s.id] || [];
+    const dishes = stationDishes[s.id] || [];
     const activeDishes = new Set(
       connections.filter(c => c.station.id === s.id && (c.hasActiveUp || c.hasActiveDown)).map(c => c.dish)
     );
