@@ -582,6 +582,36 @@ function parseDSNJSON(data) {
 
 // ── Layout: position dishes and spacecraft ───────────────────────────
 function layoutConnections(newConnections) {
+  // Save current connections to the last-seen cache
+  const seen = loadSeen();
+  const now = Date.now();
+  const positions = getStationPositions();
+  newConnections.forEach(c => {
+    seen[c.scId] = {
+      ts: now, range: c.range, rtlt: c.rtlt,
+      stationId: c.station.id, dish: c.dish,
+      hasActiveUp: c.hasActiveUp, hasActiveDown: c.hasActiveDown,
+      activity: c.activity, dataRate: c.dataRate,
+    };
+  });
+  saveSeen(seen);
+
+  // Inject stale (last-seen) spacecraft not in the current feed
+  const activeIds = new Set(newConnections.map(c => c.scId));
+  Object.entries(seen).forEach(([scId, data]) => {
+    if (activeIds.has(scId)) return;
+    const stationPos = positions.find(p => p.id === data.stationId);
+    if (!stationPos) return;
+    newConnections.push({
+      station: stationPos, dish: data.dish, scId,
+      range: data.range, rtlt: data.rtlt,
+      hasActiveUp: false, hasActiveDown: false,
+      activity: data.activity || '', dataRate: 0,
+      targetX: 0, targetY: 0, renderX: 0, renderY: 0,
+      stale: true,
+    });
+  });
+
   const conns = newConnections;
   const maxRange = Math.max(...conns.map(c => c.range), 1);
   const skyTop = H * (isMobile ? 0.04 : 0.06);
@@ -1235,7 +1265,6 @@ function loadSeen() {
     if (!raw) return {};
     const data = JSON.parse(raw);
     const now = Date.now();
-    // Prune expired entries
     Object.keys(data).forEach(k => {
       if (now - data[k].ts > SEEN_TTL) delete data[k];
     });
@@ -1246,64 +1275,6 @@ function loadSeen() {
 function saveSeen(seen) {
   try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch(e) {}
 }
-
-// Called after each data parse — merge current connections into seen cache
-function updateSeen() {
-  const seen = loadSeen();
-  const now = Date.now();
-  connections.forEach(c => {
-    seen[c.scId] = {
-      ts: now,
-      range: c.range,
-      rtlt: c.rtlt,
-      stationId: c.station.id,
-      dish: c.dish,
-      hasActiveUp: c.hasActiveUp,
-      hasActiveDown: c.hasActiveDown,
-      activity: c.activity,
-      dataRate: c.dataRate,
-    };
-  });
-  saveSeen(seen);
-}
-
-// Inject stale (last-seen) spacecraft as ghost connections
-function injectStale() {
-  const seen = loadSeen();
-  const positions = getStationPositions();
-  const activeIds = new Set(connections.map(c => c.scId));
-
-  Object.entries(seen).forEach(([scId, data]) => {
-    if (activeIds.has(scId)) return; // already live
-    const stationPos = positions.find(p => p.id === data.stationId);
-    if (!stationPos) return;
-
-    connections.push({
-      station: stationPos,
-      dish: data.dish,
-      scId,
-      range: data.range,
-      rtlt: data.rtlt,
-      hasActiveUp: false,
-      hasActiveDown: false,
-      activity: data.activity || '',
-      dataRate: 0,
-      targetX: 0, targetY: 0,
-      renderX: 0, renderY: 0,
-      stale: true,
-    });
-  });
-}
-
-// Wrap the original fetchDSN to inject stale after each parse
-const _originalFetchDSN = fetchDSN;
-fetchDSN = async function() {
-  await _originalFetchDSN();
-  updateSeen();
-  injectStale();
-  // Re-run layout with the stale entries included
-  layoutConnections(connections);
-};
 
 fetchSpacecraftNames();
 fetchDSN();
