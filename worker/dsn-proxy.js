@@ -1,11 +1,12 @@
 // WhisperDSN — Cloudflare Worker
-// Proxies NASA's DSN XML feed as JSON with CORS headers
-// Merges spacecraft names from NASA's config.xml
+// Two endpoints:
+//   GET /            — DSN live data (5s edge cache)
+//   GET /spacecraft  — spacecraft name map from NASA config.xml (24hr edge cache)
 
 const DSN_URL = 'https://eyes.jpl.nasa.gov/dsn/data/dsn.xml';
 const CONFIG_URL = 'https://eyes.nasa.gov/apps/dsn-now/config.xml';
 const DSN_CACHE_SECONDS = 5;
-const CONFIG_CACHE_SECONDS = 2592000; // 30 days
+const CONFIG_CACHE_SECONDS = 86400; // 24 hours
 
 const ALLOWED_ORIGINS = [
   'https://whisper.chrisb.cloud',
@@ -24,13 +25,10 @@ function getCorsHeaders(request) {
   };
 }
 
-// In-memory config cache (persists across requests within same isolate)
-let cachedConfig = null;
-let configFetchedAt = 0;
-
 export default {
   async fetch(request) {
     const corsHeaders = getCorsHeaders(request);
+    const url = new URL(request.url);
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders });
@@ -41,69 +39,93 @@ export default {
     const referer = request.headers.get('Referer') || '';
     const isAllowed = ALLOWED_ORIGINS.some(o => origin.startsWith(o) || referer.startsWith(o));
     if (!isAllowed) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return jsonResponse({ error: 'Forbidden' }, 403, corsHeaders);
     }
 
-    // Check edge cache first
-    const cache = caches.default;
-    const cacheKey = new Request(new URL('/', request.url).href, request);
-    const cached = await cache.match(cacheKey);
-    if (cached) return cached;
-
-    try {
-      // Fetch DSN data and config in parallel
-      const [dsnResp, spacecraft] = await Promise.all([
-        fetch(DSN_URL, { headers: { 'User-Agent': 'WhisperDSN/1.0' } }),
-        getSpacecraftConfig(),
-      ]);
-
-      if (!dsnResp.ok) {
-        return jsonResponse({ error: 'DSN feed unavailable', status: dsnResp.status }, 502, corsHeaders);
-      }
-
-      const xml = await dsnResp.text();
-      const data = parseXML(xml);
-      data.spacecraft = spacecraft;
-
-      const response = jsonResponse(data, 200, corsHeaders, {
-        'Cache-Control': `public, max-age=${DSN_CACHE_SECONDS}`,
-      });
-
-      await cache.put(cacheKey, response.clone());
-      return response;
-    } catch (e) {
-      return jsonResponse({ error: 'Failed to fetch DSN data', detail: e.message }, 502, corsHeaders);
+    if (url.pathname === '/spacecraft') {
+      return handleSpacecraft(request, corsHeaders);
     }
+    return handleDSN(request, corsHeaders);
   },
 };
 
-// Fetch and cache spacecraft names from NASA's config.xml
-async function getSpacecraftConfig() {
-  const now = Date.now();
-  if (cachedConfig && (now - configFetchedAt) < CONFIG_CACHE_SECONDS * 1000) {
-    return cachedConfig;
+// ── GET / — Live DSN data ────────────────────────────────────────────
+async function handleDSN(request, corsHeaders) {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL('/', request.url).href);
+  const cached = await cache.match(cacheKey);
+  if (cached) return addCors(cached, corsHeaders);
+
+  try {
+    const resp = await fetch(DSN_URL, {
+      headers: { 'User-Agent': 'WhisperDSN/1.0' },
+    });
+
+    if (!resp.ok) {
+      return jsonResponse({ error: 'DSN feed unavailable', status: resp.status }, 502, corsHeaders);
+    }
+
+    const xml = await resp.text();
+    const data = parseXML(xml);
+    const response = jsonResponse(data, 200, corsHeaders, {
+      'Cache-Control': `public, max-age=${DSN_CACHE_SECONDS}`,
+    });
+
+    await cache.put(cacheKey, response.clone());
+    return response;
+  } catch (e) {
+    return jsonResponse({ error: 'Failed to fetch DSN data', detail: e.message }, 502, corsHeaders);
   }
+}
+
+// ── GET /spacecraft — Name map from config.xml ───────────────────────
+async function handleSpacecraft(request, corsHeaders) {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL('/spacecraft', request.url).href);
+  const cached = await cache.match(cacheKey);
+  if (cached) return addCors(cached, corsHeaders);
 
   try {
     const resp = await fetch(CONFIG_URL, {
       headers: { 'User-Agent': 'WhisperDSN/1.0' },
     });
-    if (resp.ok) {
-      const xml = await resp.text();
-      cachedConfig = parseConfig(xml);
-      configFetchedAt = now;
-      return cachedConfig;
-    }
-  } catch (e) {}
 
-  // Return whatever we had, or empty
-  return cachedConfig || {};
+    if (!resp.ok) {
+      return jsonResponse({}, 200, corsHeaders);
+    }
+
+    const xml = await resp.text();
+    const spacecraft = parseConfig(xml);
+    const response = jsonResponse(spacecraft, 200, corsHeaders, {
+      'Cache-Control': `public, max-age=${CONFIG_CACHE_SECONDS}`,
+    });
+
+    await cache.put(cacheKey, response.clone());
+    return response;
+  } catch (e) {
+    return jsonResponse({}, 200, corsHeaders);
+  }
 }
 
-// Parse config.xml — extracts spacecraft ID → display name mapping
+// Clone a cached response with fresh CORS headers
+function addCors(response, corsHeaders) {
+  const headers = new Headers(response.headers);
+  Object.entries(corsHeaders).forEach(([k, v]) => headers.set(k, v));
+  return new Response(response.body, { status: response.status, headers });
+}
+
+function jsonResponse(data, status, corsHeaders, extraHeaders = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders,
+      ...extraHeaders,
+    },
+  });
+}
+
+// ── Config parser ────────────────────────────────────────────────────
 function parseConfig(xml) {
   const spacecraft = {};
   const regex = /<spacecraft\s+([^>]+)\/?>|<spacecraft\s+([^>]+)>[^<]*<\/spacecraft>/g;
@@ -118,18 +140,7 @@ function parseConfig(xml) {
   return spacecraft;
 }
 
-function jsonResponse(data, status, corsHeaders, extraHeaders = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...corsHeaders,
-      ...extraHeaders,
-    },
-  });
-}
-
-// Lightweight XML parser for DSN feed
+// ── DSN XML parser ───────────────────────────────────────────────────
 function parseXML(xml) {
   const result = { timestamp: null, stations: [] };
 

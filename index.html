@@ -435,11 +435,6 @@ function parseDSN(xml) {
 
 // ── JSON Parser (for Worker endpoint) ────────────────────────────────
 function parseDSNJSON(data) {
-  // Merge spacecraft names from Worker (sourced from NASA's config.xml)
-  if (data.spacecraft) {
-    Object.assign(spacecraftNames, data.spacecraft);
-  }
-
   const positions = getStationPositions();
   const newConnections = [];
 
@@ -909,6 +904,18 @@ async function fetchDSN() {
   if (audioEnabled) updateAudio();
 }
 
+// Fetch spacecraft names once on load (24hr edge cache on Worker)
+async function fetchSpacecraftNames() {
+  try {
+    const resp = await fetch(WORKER_URL + 'spacecraft');
+    if (resp.ok) {
+      const data = await resp.json();
+      Object.assign(spacecraftNames, data);
+    }
+  } catch(e) {}
+}
+
+fetchSpacecraftNames();
 fetchDSN();
 setInterval(fetchDSN, 5000);
 requestAnimationFrame(draw);
