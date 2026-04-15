@@ -570,9 +570,6 @@ function parseDSN(xml) {
     const upSignals = dish.querySelectorAll('upSignal');
     const downSignals = dish.querySelectorAll('downSignal');
 
-    const hasActiveUp = Array.from(upSignals).some(s => s.getAttribute('active') === 'true');
-    const hasActiveDown = Array.from(downSignals).some(s => s.getAttribute('active') === 'true');
-
     targets.forEach(target => {
       const scId = target.getAttribute('name');
       if (['DSN', 'DSS', 'GBRA', 'TEST', 'DOUG', 'SHAN'].includes(scId)) return;
@@ -582,6 +579,8 @@ function parseDSN(xml) {
       if (range <= 0) return;
 
       const scSignals = s => s.getAttribute('spacecraft') === scId;
+      const hasActiveUp = Array.from(upSignals).filter(scSignals).some(s => s.getAttribute('active') === 'true');
+      const hasActiveDown = Array.from(downSignals).filter(scSignals).some(s => s.getAttribute('active') === 'true');
       const maxDataRate = Math.max(0,
         ...Array.from(downSignals).filter(scSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0),
         ...Array.from(upSignals).filter(scSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0)
@@ -734,6 +733,25 @@ function layoutConnections(newConnections) {
       c.targetX = Math.min(W - 60, Math.max(60, fanCenterX + slot * spread + hashJitter));
     });
   });
+
+  // Nudge overlapping spacecraft apart
+  const minDx = isMobile ? 70 : 55;
+  const minDy = isMobile ? 18 : 14;
+  const allConns = conns.slice().sort((a, b) => a.targetY - b.targetY || a.targetX - b.targetX);
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < allConns.length; i++) {
+      for (let j = i + 1; j < allConns.length; j++) {
+        const a = allConns[i], b = allConns[j];
+        const dx = Math.abs(a.targetX - b.targetX);
+        const dy = Math.abs(a.targetY - b.targetY);
+        if (dx < minDx && dy < minDy) {
+          const pushY = (minDy - dy) / 2 + 0.5;
+          a.targetY -= pushY;
+          b.targetY += pushY;
+        }
+      }
+    }
+  }
 
   // Carry over render positions from previous frame for smooth interpolation
   const prevMap = {};
