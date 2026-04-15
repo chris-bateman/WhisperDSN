@@ -458,9 +458,17 @@ function drawStarfield(t) {
 function getStationPositions() {
   if (isMobile) {
     return [
-      { id: 'gdscc', name: 'Goldstone', loc: 'California, USA', x: W * 0.5, y: H * 0.72 },
-      { id: 'mdscc', name: 'Madrid', loc: 'Robledo, Spain', x: W * 0.5, y: H * 0.82 },
-      { id: 'cdscc', name: 'Canberra', loc: 'Tidbinbilla, Australia', x: W * 0.5, y: H * 0.92 },
+      { id: 'gdscc', name: 'Goldstone', loc: 'California, USA', x: W * 0.5, y: H * 0.65 },
+      { id: 'mdscc', name: 'Madrid', loc: 'Robledo, Spain', x: W * 0.5, y: H * 0.76 },
+      { id: 'cdscc', name: 'Canberra', loc: 'Tidbinbilla, Australia', x: W * 0.5, y: H * 0.87 },
+    ];
+  }
+  if (isShortScreen) {
+    const y = H * 0.88;
+    return [
+      { id: 'gdscc', name: 'Goldstone', loc: 'California, USA', x: W * 0.2, y },
+      { id: 'mdscc', name: 'Madrid', loc: 'Robledo, Spain', x: W * 0.5, y },
+      { id: 'cdscc', name: 'Canberra', loc: 'Tidbinbilla, Australia', x: W * 0.8, y },
     ];
   }
   const y = H * 0.82;
@@ -626,7 +634,7 @@ function layoutConnections(newConnections) {
   const conns = newConnections;
   const maxRange = Math.max(...conns.map(c => c.range), 1);
   const skyTop = H * (isMobile ? 0.04 : 0.06);
-  const skyBottom = H * (isMobile ? 0.45 : 0.55);
+  const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
 
   // Assign dish positions — small offsets from station center
   // Each unique dish gets a consistent position within the station's area
@@ -767,14 +775,14 @@ function draw(t) {
                         'rgba(212,162,106,0.08)';
       ctx.lineWidth = 1;
     } else {
-      ctx.strokeStyle = 'rgba(45,55,72,0.04)';
+      ctx.strokeStyle = 'rgba(45,55,72,0.15)';
       ctx.lineWidth = 0.5;
     }
     ctx.stroke();
 
     // Spacecraft dot
     const scName = spacecraftNames[c.scId];
-    const dotR = active ? 3 : 2;
+    const dotR = isMobile ? (active ? 5 : 3.5) : (active ? 3 : 2);
     ctx.beginPath();
     ctx.arc(c.renderX, c.renderY, dotR, 0, Math.PI * 2);
     ctx.fillStyle = active ? (c.hasActiveUp && c.hasActiveDown ? '#6abf8a' : c.hasActiveDown ? '#5b8fb9' : '#d4a26a') : '#2d3748';
@@ -782,16 +790,16 @@ function draw(t) {
 
     // Spacecraft label
     const label = scName || c.scId;
-    ctx.font = '9px "JetBrains Mono"';
+    ctx.font = (isMobile ? '11' : '9') + 'px "JetBrains Mono"';
     ctx.fillStyle = active ? 'rgba(200,214,229,0.6)' : 'rgba(74,85,104,0.4)';
     ctx.textAlign = 'center';
-    ctx.fillText(label, c.renderX, c.renderY - 8);
+    ctx.fillText(label, c.renderX, c.renderY - (isMobile ? 10 : 8));
 
     // Distance label
     if (active) {
-      ctx.font = '8px "JetBrains Mono"';
+      ctx.font = (isMobile ? '9' : '8') + 'px "JetBrains Mono"';
       ctx.fillStyle = 'rgba(74,85,104,0.5)';
-      ctx.fillText(formatDistance(c.range), c.renderX, c.renderY + 14);
+      ctx.fillText(formatDistance(c.range), c.renderX, c.renderY + (isMobile ? 16 : 14));
     }
   });
 
@@ -1011,7 +1019,7 @@ canvas.addEventListener('touchend', e => {
   mouseX = -1;
 }, { passive: false });
 
-// ── Light Pulse — click to send a pulse at proportional light speed ──
+// ── Light Pulse — click/tap to send a pulse at proportional light speed ──
 let lightPulses = [];
 const MAX_PULSE_DURATION = 30; // cap animation at 30 real seconds
 let hintShown = false;
@@ -1025,32 +1033,12 @@ setTimeout(() => {
   }
 }, 4000);
 
-canvas.addEventListener('click', e => {
-  const cx = e.clientX, cy = e.clientY;
-  let found = null;
-  let minDist = 30;
-
-  connections.forEach(c => {
-    const dx = cx - c.renderX;
-    const dy = cy - c.renderY;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    if (d < minDist) {
-      minDist = d;
-      found = c;
-    }
-  });
-
-  if (!found) return;
-
-  // Hide hint
+function fireLightPulse(found) {
   document.getElementById('pulse-hint').classList.remove('visible');
   hintShown = true;
 
-  // One-way light time in seconds
   const owlt = found.rtlt > 0 ? found.rtlt / 2 : 1;
-  // Animation duration: proportional but capped
   const duration = Math.min(owlt, MAX_PULSE_DURATION);
-  // Speed scale factor (1.0 if real-time, >1 if compressed)
   const timeScale = owlt / duration;
 
   lightPulses.push({
@@ -1059,12 +1047,17 @@ canvas.addEventListener('click', e => {
     tx: found.renderX,
     ty: found.renderY,
     startTime: performance.now(),
-    duration: duration * 1000, // ms
+    duration: duration * 1000,
     owlt,
     timeScale,
     scId: found.scId,
     name: spacecraftNames[found.scId] || found.scId,
   });
+}
+
+canvas.addEventListener('click', e => {
+  const found = findNearestSpacecraft(e.clientX, e.clientY, isMobile ? 35 : 30);
+  if (found) fireLightPulse(found);
 });
 
 // ── Audio ────────────────────────────────────────────────────────────
