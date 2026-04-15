@@ -581,9 +581,10 @@ function parseDSN(xml) {
       const rtlt = parseFloat(target.getAttribute('rtlt'));
       if (range <= 0) return;
 
-      const maxDataRate = Math.max(
-        ...Array.from(downSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0),
-        ...Array.from(upSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0)
+      const scSignals = s => s.getAttribute('spacecraft') === scId;
+      const maxDataRate = Math.max(0,
+        ...Array.from(downSignals).filter(scSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0),
+        ...Array.from(upSignals).filter(scSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0)
       );
 
       newConnections.push({
