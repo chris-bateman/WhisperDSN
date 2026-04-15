@@ -876,24 +876,25 @@ function draw(t) {
     const activeDishes = new Set(
       connections.filter(c => c.station.id === s.id && (c.hasActiveUp || c.hasActiveDown)).map(c => c.dish)
     );
-    const dishSpread = isMobile ? 20 : 30;
     const n = dishes.length;
+    const gap = isMobile ? 22 : 28;
+    const totalWidth = (n - 1) * gap;
 
     dishes.forEach((dish, i) => {
-      const offset = n > 1 ? ((i / (n - 1)) - 0.5) * dishSpread * 2 : 0;
-      const dx = s.x + offset;
-      const dy = s.y - 4;
+      const dx = s.x - totalWidth / 2 + i * gap;
+      const dy = s.y - 8;
       const active = activeDishes.has(dish);
+      const num = dish.replace('DSS', '');
 
       ctx.beginPath();
-      ctx.arc(dx, dy, active ? 2.5 : 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = active ? 'rgba(212,162,106,0.8)' : 'rgba(212,162,106,0.3)';
+      ctx.arc(dx, dy, active ? 3 : 2, 0, Math.PI * 2);
+      ctx.fillStyle = active ? 'rgba(212,162,106,0.9)' : 'rgba(212,162,106,0.25)';
       ctx.fill();
 
-      ctx.font = '7px "JetBrains Mono"';
-      ctx.fillStyle = 'rgba(212,162,106,0.3)';
+      ctx.font = '9px "JetBrains Mono"';
+      ctx.fillStyle = active ? 'rgba(212,162,106,0.7)' : 'rgba(74,85,104,0.5)';
       ctx.textAlign = 'center';
-      ctx.fillText(dish, dx, dy + 10);
+      ctx.fillText(num, dx, dy + 14);
     });
 
     // Station name and location (below the dish array)
