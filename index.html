@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WhisperDSN — Deep Space Network Live</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Instrument+Serif&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display&display=swap');
 
   :root {
     --void: #05070a;
@@ -28,7 +28,7 @@
   body {
     background: var(--void);
     color: var(--text);
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Space Mono', monospace;
     height: 100vh;
     overflow: hidden;
     cursor: crosshair;
@@ -44,7 +44,7 @@
     pointer-events: none;
   }
   .title-card h1 {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'DM Serif Display', serif;
     font-size: 22px;
     font-weight: 400;
     color: var(--gold);
@@ -119,7 +119,7 @@
   }
   .sc-tooltip.visible { opacity: 1; }
   .sc-tooltip .sc-name {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'DM Serif Display', serif;
     font-size: 16px;
     color: var(--gold);
     margin-bottom: 4px;
@@ -223,6 +223,22 @@
   .audio-toggle:hover { color: var(--gold); border-color: var(--gold); }
   .audio-toggle.active { color: var(--gold); border-color: var(--gold); }
 
+  .pulse-hint {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    pointer-events: none;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 1s;
+  }
+  .pulse-hint.visible { opacity: 1; }
+
   @media (max-width: 600px) {
     .title-card { top: 16px; left: 16px; }
     .title-card h1 { font-size: 18px; }
@@ -266,6 +282,8 @@
 </div>
 
 <button class="audio-toggle" id="audio-toggle" title="Toggle ambient audio">&#9834;</button>
+
+<div class="pulse-hint" id="pulse-hint">click a spacecraft to send a light pulse</div>
 
 <div class="sc-tooltip" id="tooltip">
   <div class="sc-name" id="tt-name"></div>
@@ -657,6 +675,89 @@ function draw(t) {
     ctx.fill();
   });
 
+  // Draw light pulse
+  if (lightPulse) {
+    const elapsed = performance.now() - lightPulse.startTime;
+    const progress = Math.min(elapsed / lightPulse.duration, 1);
+    const x = lightPulse.sx + (lightPulse.tx - lightPulse.sx) * progress;
+    const y = lightPulse.sy + (lightPulse.ty - lightPulse.sy) * progress;
+
+    // Bright pulse dot with glow
+    const pulseAlpha = progress < 1 ? 1 : 0;
+    if (pulseAlpha > 0) {
+      // Glow
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, 12);
+      grd.addColorStop(0, 'rgba(255,240,200,0.6)');
+      grd.addColorStop(0.5, 'rgba(212,162,106,0.15)');
+      grd.addColorStop(1, 'rgba(212,162,106,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(x - 12, y - 12, 24, 24);
+
+      // Core dot
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,240,200,0.9)';
+      ctx.fill();
+
+      // Trail
+      const trailLen = 0.04;
+      for (let i = 1; i <= 5; i++) {
+        const tp = Math.max(progress - trailLen * i, 0);
+        const tx = lightPulse.sx + (lightPulse.tx - lightPulse.sx) * tp;
+        const ty = lightPulse.sy + (lightPulse.ty - lightPulse.sy) * tp;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 1.5 - i * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(212,162,106,${0.3 - i * 0.05})`;
+        ctx.fill();
+      }
+
+      // Timer label — shows elapsed light time
+      const displayTime = (elapsed / 1000) * lightPulse.timeScale;
+      let timeStr;
+      if (displayTime < 60) timeStr = displayTime.toFixed(1) + 's';
+      else if (displayTime < 3600) timeStr = (displayTime / 60).toFixed(1) + ' min';
+      else timeStr = (displayTime / 3600).toFixed(1) + ' hrs';
+
+      ctx.font = '10px "IBM Plex Mono"';
+      ctx.fillStyle = 'rgba(212,162,106,0.8)';
+      ctx.textAlign = 'center';
+      ctx.fillText(timeStr, x, y - 16);
+
+      // Spacecraft name at target end
+      if (progress > 0.1) {
+        ctx.font = '8px "IBM Plex Mono"';
+        ctx.fillStyle = 'rgba(212,162,106,0.4)';
+        ctx.fillText(lightPulse.name, lightPulse.tx, lightPulse.ty - 20);
+      }
+    }
+
+    // Arrival flash
+    if (progress >= 1) {
+      const fadeTime = elapsed - lightPulse.duration;
+      const fadeAlpha = Math.max(1 - fadeTime / 1500, 0);
+      if (fadeAlpha > 0) {
+        const grd = ctx.createRadialGradient(lightPulse.tx, lightPulse.ty, 0, lightPulse.tx, lightPulse.ty, 20 + (1 - fadeAlpha) * 10);
+        grd.addColorStop(0, `rgba(255,240,200,${fadeAlpha * 0.5})`);
+        grd.addColorStop(1, 'rgba(255,240,200,0)');
+        ctx.fillStyle = grd;
+        ctx.fillRect(lightPulse.tx - 30, lightPulse.ty - 30, 60, 60);
+
+        // Final time
+        const totalTime = lightPulse.owlt;
+        let finalStr;
+        if (totalTime < 60) finalStr = totalTime.toFixed(1) + 's';
+        else if (totalTime < 3600) finalStr = (totalTime / 60).toFixed(1) + ' min';
+        else finalStr = (totalTime / 3600).toFixed(1) + ' hrs';
+        ctx.font = '11px "IBM Plex Mono"';
+        ctx.fillStyle = `rgba(212,162,106,${fadeAlpha})`;
+        ctx.textAlign = 'center';
+        ctx.fillText(finalStr + ' — arrived', lightPulse.tx, lightPulse.ty - 20);
+      } else {
+        lightPulse = null;
+      }
+    }
+  }
+
   // Draw stations and dishes
   stationPositions.forEach(s => {
     // Station glow
@@ -745,6 +846,62 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mouseleave', () => {
   mouseX = -1;
   tooltip.classList.remove('visible');
+});
+
+// ── Light Pulse — click to send a pulse at proportional light speed ──
+let lightPulse = null;
+const MAX_PULSE_DURATION = 30; // cap animation at 30 real seconds
+let hintShown = false;
+
+// Show hint after a few seconds
+setTimeout(() => {
+  if (!hintShown) {
+    document.getElementById('pulse-hint').classList.add('visible');
+    setTimeout(() => document.getElementById('pulse-hint').classList.remove('visible'), 6000);
+    hintShown = true;
+  }
+}, 4000);
+
+canvas.addEventListener('click', e => {
+  const cx = e.clientX, cy = e.clientY;
+  let found = null;
+  let minDist = 30;
+
+  connections.forEach(c => {
+    const dx = cx - c.renderX;
+    const dy = cy - c.renderY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < minDist) {
+      minDist = d;
+      found = c;
+    }
+  });
+
+  if (!found) return;
+
+  // Hide hint
+  document.getElementById('pulse-hint').classList.remove('visible');
+  hintShown = true;
+
+  // One-way light time in seconds
+  const owlt = found.rtlt > 0 ? found.rtlt / 2 : 1;
+  // Animation duration: proportional but capped
+  const duration = Math.min(owlt, MAX_PULSE_DURATION);
+  // Speed scale factor (1.0 if real-time, >1 if compressed)
+  const timeScale = owlt / duration;
+
+  lightPulse = {
+    sx: found.dishX,
+    sy: found.dishY,
+    tx: found.renderX,
+    ty: found.renderY,
+    startTime: performance.now(),
+    duration: duration * 1000, // ms
+    owlt,
+    timeScale,
+    scId: found.scId,
+    name: spacecraftNames[found.scId] || found.scId,
+  };
 });
 
 // ── Audio ────────────────────────────────────────────────────────────
