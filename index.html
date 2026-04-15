@@ -1067,7 +1067,10 @@ function checkHover() {
     } else {
       tooltip.style.transform = 'none';
       tooltip.style.left = Math.min(mouseX + 16, W - 280) + 'px';
-      tooltip.style.top = Math.max(mouseY - 20, 10) + 'px';
+      // Position above cursor if near bottom of screen
+      const ttHeight = tooltip.offsetHeight || 200;
+      const top = mouseY + ttHeight + 20 > H ? mouseY - ttHeight - 10 : mouseY - 20;
+      tooltip.style.top = Math.max(top, 10) + 'px';
     }
     tooltip.classList.add('visible');
   }
