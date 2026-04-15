@@ -473,22 +473,35 @@ function parseDSNJSON(data) {
   layoutConnections(newConnections);
 }
 
-// ── Layout: dedup, position, smooth handoff ──────────────────────────
+// ── Layout: position dishes and spacecraft ───────────────────────────
 function layoutConnections(newConnections) {
-  // Deduplicate — one entry per spacecraft, prefer active
-  const scMap = {};
-  newConnections.forEach(c => {
-    if (!scMap[c.scId] || (c.hasActiveUp || c.hasActiveDown)) {
-      scMap[c.scId] = c;
-    }
-  });
-
-  const conns = Object.values(scMap);
+  const conns = newConnections;
   const maxRange = Math.max(...conns.map(c => c.range), 1);
   const skyTop = H * (isMobile ? 0.04 : 0.06);
   const skyBottom = H * (isMobile ? 0.45 : 0.55);
 
-  // Group by station for fan-out spreading
+  // Assign dish positions — small offsets from station center
+  // Each unique dish gets a consistent position within the station's area
+  const dishPositions = {};
+  conns.forEach(c => {
+    const dishKey = c.station.id + ':' + c.dish;
+    if (!dishPositions[dishKey]) {
+      const stationDishes = conns.filter(d => d.station.id === c.station.id);
+      const uniqueDishes = [...new Set(stationDishes.map(d => d.dish))].sort();
+      const idx = uniqueDishes.indexOf(c.dish);
+      const n = uniqueDishes.length;
+      const dishSpread = isMobile ? 20 : 30;
+      const offset = n > 1 ? ((idx / (n - 1)) - 0.5) * dishSpread * 2 : 0;
+      dishPositions[dishKey] = {
+        x: c.station.x + offset,
+        y: c.station.y - 4,
+      };
+    }
+    c.dishX = dishPositions[dishKey].x;
+    c.dishY = dishPositions[dishKey].y;
+  });
+
+  // Group by station for spacecraft fan-out
   const byStation = {};
   conns.forEach(c => {
     const sid = c.station.id;
@@ -511,17 +524,17 @@ function layoutConnections(newConnections) {
 
       // Horizontal: even fan from station center
       const slot = n > 1 ? (i / (n - 1)) - 0.5 : 0;
-      const hashJitter = ((hashCode(c.scId) % 50) / 50 - 0.5) * 30;
+      const hashJitter = ((hashCode(c.scId + c.dish) % 50) / 50 - 0.5) * 30;
       c.targetX = Math.min(W - 60, Math.max(60, stationX + slot * spread + hashJitter));
     });
   });
 
   // Carry over render positions from previous frame for smooth interpolation
   const prevMap = {};
-  connections.forEach(c => { prevMap[c.scId] = c; });
+  connections.forEach(c => { prevMap[c.scId + ':' + c.dish] = c; });
 
   conns.forEach(c => {
-    const prev = prevMap[c.scId];
+    const prev = prevMap[c.scId + ':' + c.dish];
     if (prev) {
       c.renderX = prev.renderX;
       c.renderY = prev.renderY;
@@ -559,10 +572,10 @@ function spawnParticles() {
     const speed = (0.004 + Math.random() * 0.004) * speedFactor;
 
     particles.push({
-      sx: goingUp ? c.station.x : c.renderX,
-      sy: goingUp ? c.station.y : c.renderY,
-      tx: goingUp ? c.renderX : c.station.x,
-      ty: goingUp ? c.renderY : c.station.y,
+      sx: goingUp ? c.dishX : c.renderX,
+      sy: goingUp ? c.dishY : c.renderY,
+      tx: goingUp ? c.renderX : c.dishX,
+      ty: goingUp ? c.renderY : c.dishY,
       progress: 0,
       speed,
       r: goingUp ? 212 : 91,
@@ -593,11 +606,11 @@ function draw(t) {
 
   const stationPositions = getStationPositions();
 
-  // Draw connections
+  // Draw connections (lines from dish positions to spacecraft)
   connections.forEach(c => {
     const active = c.hasActiveUp || c.hasActiveDown;
     ctx.beginPath();
-    ctx.moveTo(c.station.x, c.station.y);
+    ctx.moveTo(c.dishX, c.dishY);
     ctx.lineTo(c.renderX, c.renderY);
     if (active) {
       const both = c.hasActiveUp && c.hasActiveDown;
@@ -649,25 +662,37 @@ function draw(t) {
     ctx.fill();
   });
 
-  // Draw stations
+  // Draw stations and dishes
   stationPositions.forEach(s => {
-    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 30);
-    grad.addColorStop(0, 'rgba(212,162,106,0.12)');
+    // Station glow
+    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 40);
+    grad.addColorStop(0, 'rgba(212,162,106,0.10)');
     grad.addColorStop(1, 'rgba(212,162,106,0)');
     ctx.fillStyle = grad;
-    ctx.fillRect(s.x - 30, s.y - 30, 60, 60);
+    ctx.fillRect(s.x - 40, s.y - 40, 80, 80);
 
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#d4a26a';
-    ctx.fill();
+    // Draw individual dish dots
+    const stationConns = connections.filter(c => c.station.id === s.id);
+    const drawnDishes = new Set();
+    stationConns.forEach(c => {
+      if (drawnDishes.has(c.dish)) return;
+      drawnDishes.add(c.dish);
+      const active = c.hasActiveUp || c.hasActiveDown;
 
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(212,162,106,0.25)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+      // Dish dot
+      ctx.beginPath();
+      ctx.arc(c.dishX, c.dishY, active ? 2.5 : 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = active ? 'rgba(212,162,106,0.8)' : 'rgba(212,162,106,0.3)';
+      ctx.fill();
 
+      // Dish label (tiny, below dish dot)
+      ctx.font = '7px "IBM Plex Mono"';
+      ctx.fillStyle = 'rgba(212,162,106,0.3)';
+      ctx.textAlign = 'center';
+      ctx.fillText(c.dish, c.dishX, c.dishY + 10);
+    });
+
+    // Station name and location (below the dish array)
     ctx.font = '11px "IBM Plex Mono"';
     ctx.fillStyle = '#c8d6e5';
     ctx.textAlign = 'center';
