@@ -7,11 +7,22 @@ const CONFIG_URL = 'https://eyes.nasa.gov/apps/dsn-now/config.xml';
 const DSN_CACHE_SECONDS = 5;
 const CONFIG_CACHE_SECONDS = 2592000; // 30 days
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+const ALLOWED_ORIGINS = [
+  'https://whisper.chrisb.cloud',
+  'https://whisperdsn.pages.dev',
+  'http://localhost',
+  'http://127.0.0.1',
+];
+
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  const allowed = ALLOWED_ORIGINS.some(o => origin.startsWith(o));
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
 
 // In-memory config cache (persists across requests within same isolate)
 let cachedConfig = null;
@@ -19,8 +30,21 @@ let configFetchedAt = 0;
 
 export default {
   async fetch(request) {
+    const corsHeaders = getCorsHeaders(request);
+
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
+    // Block requests without a valid origin/referer
+    const origin = request.headers.get('Origin') || '';
+    const referer = request.headers.get('Referer') || '';
+    const isAllowed = ALLOWED_ORIGINS.some(o => origin.startsWith(o) || referer.startsWith(o));
+    if (!isAllowed) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Check edge cache first
@@ -37,21 +61,21 @@ export default {
       ]);
 
       if (!dsnResp.ok) {
-        return jsonResponse({ error: 'DSN feed unavailable', status: dsnResp.status }, 502);
+        return jsonResponse({ error: 'DSN feed unavailable', status: dsnResp.status }, 502, corsHeaders);
       }
 
       const xml = await dsnResp.text();
       const data = parseXML(xml);
       data.spacecraft = spacecraft;
 
-      const response = jsonResponse(data, 200, {
+      const response = jsonResponse(data, 200, corsHeaders, {
         'Cache-Control': `public, max-age=${DSN_CACHE_SECONDS}`,
       });
 
       await cache.put(cacheKey, response.clone());
       return response;
     } catch (e) {
-      return jsonResponse({ error: 'Failed to fetch DSN data', detail: e.message }, 502);
+      return jsonResponse({ error: 'Failed to fetch DSN data', detail: e.message }, 502, corsHeaders);
     }
   },
 };
@@ -94,12 +118,12 @@ function parseConfig(xml) {
   return spacecraft;
 }
 
-function jsonResponse(data, status, extraHeaders = {}) {
+function jsonResponse(data, status, corsHeaders, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      ...CORS_HEADERS,
+      ...corsHeaders,
       ...extraHeaders,
     },
   });
