@@ -711,11 +711,14 @@ function layoutConnections(newConnections) {
     byStation[sid].push(c);
   });
 
-  Object.values(byStation).forEach(group => {
+  const stationIds = Object.keys(byStation);
+  Object.entries(byStation).forEach(([sid, group]) => {
     group.sort((a, b) => a.range - b.range);
     const n = group.length;
     const stationX = group[0].station.x;
-    const spread = isMobile ? W * 0.8 : W * 0.25;
+    // Mobile: each station gets its own horizontal zone to prevent overlap
+    const fanCenterX = isMobile ? W * ((stationIds.indexOf(sid) + 0.5) / stationIds.length) : stationX;
+    const spread = isMobile ? W * (0.7 / stationIds.length) : W * 0.25;
 
     group.forEach((c, i) => {
       // Vertical: log-scale distance
@@ -727,7 +730,7 @@ function layoutConnections(newConnections) {
       // Horizontal: even fan from station center
       const slot = n > 1 ? (i / (n - 1)) - 0.5 : 0;
       const hashJitter = ((hashCode(c.scId + c.dish) % 50) / 50 - 0.5) * 30;
-      c.targetX = Math.min(W - 60, Math.max(60, stationX + slot * spread + hashJitter));
+      c.targetX = Math.min(W - 60, Math.max(60, fanCenterX + slot * spread + hashJitter));
     });
   });
 
