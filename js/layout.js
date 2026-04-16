@@ -1,11 +1,13 @@
 // ── Station Positions ────────────────────────────────────────────────
 function getStationPositions() {
   if (isMobile) {
-    return [
-      { id: 'gdscc', name: 'Goldstone', loc: 'California, USA', x: W * 0.5, y: H * 0.65 },
-      { id: 'mdscc', name: 'Madrid', loc: 'Robledo, Spain', x: W * 0.5, y: H * 0.76 },
-      { id: 'cdscc', name: 'Canberra', loc: 'Tidbinbilla, Australia', x: W * 0.5, y: H * 0.87 },
+    const all = [
+      { id: 'gdscc', name: 'Goldstone', loc: 'California, USA' },
+      { id: 'mdscc', name: 'Madrid', loc: 'Robledo, Spain' },
+      { id: 'cdscc', name: 'Canberra', loc: 'Tidbinbilla, Australia' },
     ];
+    const s = all[mobileStationIndex];
+    return [{ ...s, x: W * 0.5, y: H * 0.82 }];
   }
   if (isShortScreen) {
     const y = H * 0.88;
@@ -61,7 +63,7 @@ function layoutConnections(newConnections) {
   currentMaxRange = maxRange;
   const headerFloor = isMobile ? 100 : 75;
   const skyTop = Math.max(H * (isMobile ? 0.12 : 0.06), headerFloor);
-  const skyBottom = H * (isMobile || isShortScreen ? 0.58 : 0.78);
+  const skyBottom = H * (isMobile ? 0.75 : isShortScreen ? 0.58 : 0.78);
 
   // Group by station for spacecraft fan-out
   const byStation = {};
@@ -140,7 +142,10 @@ function layoutConnections(newConnections) {
 
   // Update active count
   const activeCount = conns.filter(c => c.hasActiveUp || c.hasActiveDown).length;
-  document.getElementById('active-count').textContent = activeCount + ' active links';
+  const countLabel = isMobile
+    ? activeCount + ' active at ' + stationPositions[0].name
+    : activeCount + ' active links';
+  document.getElementById('active-count').textContent = countLabel;
 
   // Update data rate and power stats
   dataRateTarget = conns

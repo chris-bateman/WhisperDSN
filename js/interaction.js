@@ -260,6 +260,9 @@ function timeAgo(date) {
 }
 
 // ── Touch Events ────────────────────────────────────────────────────
+let touchStartX = 0, touchStartY = 0;
+let isSwiping = false;
+
 function findNearestSpacecraft(x, y, radius) {
   let found = null;
   let minDist = radius;
@@ -279,6 +282,9 @@ canvas.addEventListener('touchstart', e => {
   if (gameState) return;
   e.preventDefault();
   const touch = e.touches[0];
+  touchStartX = touch.clientX;
+  touchStartY = touch.clientY;
+  isSwiping = false;
   mouseX = touch.clientX;
   mouseY = touch.clientY;
 }, { passive: false });
@@ -287,13 +293,37 @@ canvas.addEventListener('touchmove', e => {
   if (gameState) return;
   e.preventDefault();
   const touch = e.touches[0];
-  mouseX = touch.clientX;
-  mouseY = touch.clientY;
+  if (isMobile) {
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+    if (Math.abs(dx) > 20 && Math.abs(dy) < 30) isSwiping = true;
+  }
+  if (!isSwiping) {
+    mouseX = touch.clientX;
+    mouseY = touch.clientY;
+  }
 }, { passive: false });
 
 canvas.addEventListener('touchend', e => {
   if (gameState) return;
   e.preventDefault();
+
+  if (isMobile && isSwiping) {
+    const endX = e.changedTouches[0].clientX;
+    const swipeDx = endX - touchStartX;
+    if (Math.abs(swipeDx) > 50) {
+      if (swipeDx < 0 && mobileStationIndex < 2) mobileStationIndex++;
+      else if (swipeDx > 0 && mobileStationIndex > 0) mobileStationIndex--;
+      activeTooltipConn = null;
+      tooltip.classList.remove('visible');
+      stationPositions = getStationPositions();
+      connections = connections.filter(c => c.station.id === STATION_ORDER[mobileStationIndex]);
+    }
+    isSwiping = false;
+    mouseX = -1;
+    return;
+  }
+
   if (hitTestEasterRock(mouseX, mouseY)) { activateGame(); return; }
   const found = findNearestSpacecraft(mouseX, mouseY, 35);
 

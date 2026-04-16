@@ -48,7 +48,7 @@ function getDishPos(stationId, dishName) {
   const dishes = stationDishes[stationId] || [];
   const idx = dishes.indexOf(dishName);
   const n = dishes.length;
-  const gap = isMobile ? 22 : 28;
+  const gap = isMobile ? 16 : 28;
   const totalWidth = (n - 1) * gap;
   const x = idx >= 0 ? s.x - totalWidth / 2 + idx * gap : s.x;
   return { x, y: s.y - 8 };

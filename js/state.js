@@ -26,6 +26,8 @@ let powerTarget = 0, powerDisplay = 0;
 let isMobile = false;
 let isShortScreen = false;
 let activeTooltipConn = null;
+let mobileStationIndex = 0;
+const STATION_ORDER = ['gdscc', 'mdscc', 'cdscc'];
 let stationPositions = [];
 const MAX_LOG_RANGE = Math.log10(25e9); // ~Voyager distance
 let currentMaxRange = 25e9; // updated from layoutConnections

@@ -154,7 +154,7 @@ function draw(t) {
       connections.filter(c => c.station.id === s.id && (c.hasActiveUp || c.hasActiveDown)).map(c => c.dish)
     );
     const n = dishes.length;
-    const gap = isMobile ? 22 : 28;
+    const gap = isMobile ? 16 : 28;
     const totalWidth = (n - 1) * gap;
 
     dishes.forEach((dish, i) => {
@@ -207,6 +207,17 @@ function draw(t) {
       ctx.font = '8px "JetBrains Mono"';
       ctx.fillStyle = 'rgba(74,85,104,0.4)';
       ctx.fillText('last: ' + name + ' ' + agoStr, s.x, s.y + 50);
+    }
+
+    // Station pagination dots (mobile swipe indicator)
+    if (isMobile) {
+      const dotY = s.y + 56;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(s.x - 14 + i * 14, dotY, i === mobileStationIndex ? 3 : 2, 0, Math.PI * 2);
+        ctx.fillStyle = i === mobileStationIndex ? 'rgba(212,162,106,0.8)' : 'rgba(74,85,104,0.4)';
+        ctx.fill();
+      }
     }
   });
 
