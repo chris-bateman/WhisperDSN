@@ -44,24 +44,17 @@
     <button class="about-close" id="about-close">&times;</button>
     <h2>WhisperDSN</h2>
     <p>A live visualization of NASA's Deep Space Network — the array of giant radio antennas that humanity uses to communicate with spacecraft across the solar system.</p>
-    <p>Three ground stations in California, Spain, and Australia take turns talking to every active mission, from rovers on Mars to Voyager at the edge of interstellar space.</p>
-    <p>What you see here is real. The connections, the data rates, the distances — all sourced from NASA's live DSN feed, updated every five seconds.</p>
-    <h3>What the colors mean</h3>
-    <p><span style="color:var(--gold)">Gold</span> — the station is transmitting commands to the spacecraft.<br>
-    <span style="color:var(--blue)">Blue</span> — the station is receiving data back.<br>
-    <span style="color:var(--green)">Green</span> — two-way link, talking and listening simultaneously.<br>
-    <span style="color:var(--muted)">Gray</span> — the dish is pointed but idle.</p>
-    <h3>Light pulses</h3>
-    <p>Click any spacecraft to send a pulse of light toward it. The pulse travels at proportional speed — a signal to the Moon arrives in about 1.3 seconds. A signal to Voyager takes over 23 hours. You can click multiple spacecraft to race them.</p>
-    <h3>Dish status</h3>
-    <p>Hover over a station to see what each dish is doing. Status comes directly from NASA's feed:</p>
-    <p><span style="color:var(--green)">Telemetry, Tracking, Command</span> — actively communicating with a spacecraft.<br>
-    <span style="color:var(--blue)">Engineering Sustaining</span> — dish is available and on standby.<br>
-    <span style="color:var(--gold)">Engineering Upgrades</span> — dish is being upgraded, temporarily offline.<br>
-    <span style="color:var(--red)">Antenna Maintenance</span> — scheduled or unplanned maintenance.<br>
-    <span style="color:var(--dim)">Other</span> — radar astronomy, calibration, or internal testing.</p>
-    <h3>The map fills up over time</h3>
-    <p>Spacecraft stay on screen for 24 hours after they were last tracked. As the Earth rotates and different stations pick up different targets, the sky fills with everything the DSN is talking to. Check back later and you'll see more.</p>
+    <p>Everything here is real. Three ground stations in California, Spain, and Australia take turns talking to every active mission, from rovers on Mars to Voyager at the edge of interstellar space. Data updates every five seconds.</p>
+    <h3>Reading the display</h3>
+    <p><span style="color:var(--gold)">Gold</span> — transmitting to spacecraft.
+    <span style="color:var(--blue)">Blue</span> — receiving data.
+    <span style="color:var(--green)">Green</span> — two-way link.
+    <span style="color:var(--muted)">Gray</span> — idle.</p>
+    <p>Spacecraft are plotted by distance with recognizable silhouettes for known missions. Horizontal lines mark planet distances for reference. Waveforms along active connections show signal band and data rate.</p>
+    <h3>Interact</h3>
+    <p>Hover or tap spacecraft and stations for details. Click a spacecraft to send a light pulse at proportional speed — Moon in ~1.3 seconds, Voyager in over 23 hours. Click a planet marker to see which spacecraft orbit it.</p>
+    <h3>Over time</h3>
+    <p>Spacecraft stay visible for 24 hours after last contact. As Earth rotates and stations hand off targets, the sky fills up. Check back later to see more.</p>
     <p class="about-footer">Built by <a href="https://chrisb.cloud" target="_blank">Chris Bateman</a>. Data from <a href="https://eyes.nasa.gov/apps/dsn-now/dsn.html" target="_blank">NASA/JPL DSN Now</a>.</p>
     <p class="about-footer" style="color:var(--muted);margin-top:8px;font-size:9px">Not all objects in the sky are spacecraft. Some are just <a href="https://eyes.nasa.gov/apps/asteroids/" target="_blank" style="color:var(--dim)">rocks</a>.</p>
   </div>
