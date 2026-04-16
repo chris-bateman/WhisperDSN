@@ -36,7 +36,7 @@ const DISTANCE_MARKERS = [
 ];
 
 function drawDistanceMarkers() {
-  const headerFloor = isMobile ? 100 : 75;
+  const headerFloor = isMobile ? 110 : 85;
   const skyTop = Math.max(H * (isMobile ? 0.12 : 0.06), headerFloor);
   const skyBottom = H * (isMobile || isShortScreen ? 0.58 : 0.78);
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
