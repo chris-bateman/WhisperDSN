@@ -437,6 +437,7 @@ let isShortScreen = false;
 let activeTooltipConn = null;
 let stationPositions = [];
 const MAX_LOG_RANGE = Math.log10(25e9); // ~Voyager distance
+let currentMaxRange = 25e9; // updated from layoutConnections
 
 // ── Planet Distance Markers ─────────────────────────────────────────
 const PLANET_MARKERS = [
@@ -490,11 +491,13 @@ function drawStarfield(t) {
 function drawPlanetMarkers() {
   const skyTop = H * (isMobile ? 0.04 : 0.06);
   const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
-  const maxLog = MAX_LOG_RANGE;
+  const maxLog = Math.log10(Math.max(currentMaxRange, 100));
   // Mobile: right edge to avoid title/status overlap
   const labelX = isMobile ? W - 14 : 20;
 
   PLANET_MARKERS.forEach(p => {
+    // Skip planets further than any tracked spacecraft
+    if (p.distance > currentMaxRange * 1.5) return;
     const logDist = Math.log10(p.distance);
     const yRatio = 1 - (logDist / maxLog);
     const y = skyTop + yRatio * (skyBottom - skyTop);
@@ -893,6 +896,7 @@ function layoutConnections(newConnections) {
 
   const conns = newConnections;
   const maxRange = Math.max(...conns.map(c => c.range), 1);
+  currentMaxRange = maxRange;
   const skyTop = H * (isMobile ? 0.04 : 0.06);
   const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
 
