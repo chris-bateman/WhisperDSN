@@ -50,6 +50,7 @@ setTimeout(() => {
 // ── Boot ─────────────────────────────────────────────────────────────
 resize();
 fetchSpacecraftNames();
+fetchDistances();
 fetchDSN();
 setInterval(fetchDSN, 5000);
 requestAnimationFrame(draw);

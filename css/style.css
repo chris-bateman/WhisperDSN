@@ -135,6 +135,15 @@ canvas { display: block; touch-action: manipulation; }
   color: var(--dim);
   margin-top: 6px;
   line-height: 1.5;
+  white-space: pre-line;
+}
+.sc-tooltip .sc-desc a {
+  color: var(--dim);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--dim);
+}
+.sc-tooltip .sc-desc a:hover {
+  color: var(--text);
 }
 
 .status-bar {

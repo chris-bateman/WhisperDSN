@@ -1,12 +1,37 @@
 // WhisperDSN — Cloudflare Worker
-// Two endpoints:
+// Endpoints:
 //   GET /            — DSN live data (5s edge cache)
 //   GET /spacecraft  — spacecraft name map from NASA config.xml (24hr edge cache)
+//   GET /distances   — real planet distances from JPL Horizons (24hr edge cache)
+//   GET /news?sc=XX  — latest mission news from NASA RSS feeds (4hr edge cache)
 
 const DSN_URL = 'https://eyes.jpl.nasa.gov/dsn/data/dsn.xml';
 const CONFIG_URL = 'https://eyes.nasa.gov/apps/dsn-now/config.xml';
 const DSN_CACHE_SECONDS = 5;
 const CONFIG_CACHE_SECONDS = 86400; // 24 hours
+const DISTANCES_CACHE_SECONDS = 86400; // 24 hours
+const NEWS_CACHE_SECONDS = 14400; // 4 hours
+
+const HORIZONS_URL = 'https://ssd.jpl.nasa.gov/api/horizons.api';
+const AU_TO_KM = 149597870.7;
+
+// Horizons body IDs for geocentric distance queries
+const HORIZONS_BODIES = {
+  Moon: '301', Mercury: '199', Venus: '299', Mars: '499',
+  Sun: '10', Jupiter: '599', Saturn: '699', Uranus: '799', Neptune: '899',
+};
+
+// DSN spacecraft code → NASA RSS feed slug
+const NEWS_FEEDS = {
+  JWST: 'missions/webb/feed/',
+  M20:  'missions/mars-2020-perseverance/perseverance-rover/feed/',
+  MSL:  'missions/mars-science-laboratory/curiosity-rover/feed/',
+  JNO:  'missions/juno/feed/',
+  VGR1: 'missions/voyager-program/feed/',
+  VGR2: 'missions/voyager-program/feed/',
+  NHPC: 'missions/new-horizons/feed/',
+  SPP:  'missions/parker-solar-probe/feed/',
+};
 
 const ALLOWED_ORIGINS = [
   'https://whisper.chrisb.cloud',
@@ -44,6 +69,12 @@ export default {
 
     if (url.pathname === '/spacecraft') {
       return handleSpacecraft(request, corsHeaders);
+    }
+    if (url.pathname === '/distances') {
+      return handleDistances(request, corsHeaders);
+    }
+    if (url.pathname === '/news') {
+      return handleNews(request, url, corsHeaders);
     }
     return handleDSN(request, corsHeaders);
   },
@@ -104,6 +135,83 @@ async function handleSpacecraft(request, corsHeaders) {
     return response;
   } catch (e) {
     return jsonResponse({}, 200, corsHeaders);
+  }
+}
+
+// ── GET /distances — Real planet distances from JPL Horizons ────────
+async function handleDistances(request, corsHeaders) {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL('/distances', request.url).href);
+  const cached = await cache.match(cacheKey);
+  if (cached) return addCors(cached, corsHeaders);
+
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const distances = {};
+
+    for (const [name, id] of Object.entries(HORIZONS_BODIES)) {
+      try {
+        const params = new URLSearchParams({
+          format: 'json', COMMAND: `'${id}'`, OBJ_DATA: "'NO'",
+          MAKE_EPHEM: "'YES'", EPHEM_TYPE: "'OBSERVER'", CENTER: "'500@399'",
+          START_TIME: `'${today}'`, STOP_TIME: `'${tomorrow}'`,
+          STEP_SIZE: "'1d'", QUANTITIES: "'20'",
+        });
+        const resp = await fetch(`${HORIZONS_URL}?${params}`, {
+          headers: { 'User-Agent': 'WhisperDSN/1.0' },
+        });
+        if (!resp.ok) continue;
+        const data = await resp.json();
+        const text = data.result || '';
+        const soeIdx = text.indexOf('$$SOE');
+        const eoeIdx = text.indexOf('$$EOE');
+        if (soeIdx < 0 || eoeIdx < 0) continue;
+        const line = text.substring(soeIdx + 5, eoeIdx).trim().split('\n')[0];
+        const delta = parseFloat(line.trim().split(/\s+/)[2]);
+        if (!isNaN(delta)) distances[name] = Math.round(delta * AU_TO_KM);
+      } catch (_) { /* skip this body */ }
+    }
+
+    const response = jsonResponse(distances, 200, corsHeaders, {
+      'Cache-Control': `public, max-age=${DISTANCES_CACHE_SECONDS}`,
+    });
+    await cache.put(cacheKey, response.clone());
+    return response;
+  } catch (e) {
+    return jsonResponse({}, 200, corsHeaders);
+  }
+}
+
+// ── GET /news?sc=XX — Mission news from NASA RSS feeds ─────────────
+async function handleNews(request, url, corsHeaders) {
+  const sc = (url.searchParams.get('sc') || '').toUpperCase();
+  if (!sc) return jsonResponse([], 200, corsHeaders);
+
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(`/news?sc=${sc}`, request.url).href);
+  const cached = await cache.match(cacheKey);
+  if (cached) return addCors(cached, corsHeaders);
+
+  try {
+    const feedSlug = NEWS_FEEDS[sc];
+    if (!feedSlug) return jsonResponse([], 200, corsHeaders);
+
+    const resp = await fetch(`https://www.nasa.gov/${feedSlug}`, {
+      headers: { 'User-Agent': 'WhisperDSN/1.0' },
+    });
+    if (!resp.ok) return jsonResponse([], 200, corsHeaders);
+
+    const xml = await resp.text();
+    const items = parseRSS(xml);
+
+    const response = jsonResponse(items, 200, corsHeaders, {
+      'Cache-Control': `public, max-age=${NEWS_CACHE_SECONDS}`,
+    });
+    await cache.put(cacheKey, response.clone());
+    return response;
+  } catch (e) {
+    return jsonResponse([], 200, corsHeaders);
   }
 }
 
@@ -235,4 +343,21 @@ function parseAttrs(str) {
     attrs[match[1]] = match[2];
   }
   return attrs;
+}
+
+// ── RSS parser ──────────────────────────────────────────────────────
+function parseRSS(xml) {
+  const items = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+  while ((match = itemRegex.exec(xml)) !== null && items.length < 3) {
+    const body = match[1];
+    const title = (body.match(/<title>(.*?)<\/title>/) || [])[1] || '';
+    const link = (body.match(/<link>(.*?)<\/link>/) || [])[1] || '';
+    const pubDate = (body.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1] || '';
+    const clean = title.replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+    if (!clean) continue;
+    items.push({ title: clean, link, date: pubDate });
+  }
+  return items;
 }

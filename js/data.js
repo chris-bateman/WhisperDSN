@@ -103,3 +103,37 @@ async function fetchSpacecraftNames() {
     }
   } catch(e) {}
 }
+
+// Fetch real planet distances from JPL Horizons (24hr edge cache on Worker)
+async function fetchDistances() {
+  try {
+    const resp = await fetch(WORKER_URL + 'distances');
+    if (resp.ok) {
+      const data = await resp.json();
+      // Update DISTANCE_MARKERS and PLANET_MARKERS with live values
+      for (const [name, km] of Object.entries(data)) {
+        DISTANCE_MARKERS.forEach(m => {
+          if (m.label === name) m.distance = km;
+        });
+        if (PLANET_BY_NAME[name]) PLANET_BY_NAME[name].distance = km;
+      }
+      planetDistancesLive = true;
+    }
+  } catch(e) {}
+}
+
+// Fetch mission news for a spacecraft (4hr edge cache on Worker)
+const newsCache = {};
+async function fetchNews(scId) {
+  if (newsCache[scId] !== undefined) return newsCache[scId];
+  try {
+    const resp = await fetch(WORKER_URL + 'news?sc=' + encodeURIComponent(scId));
+    if (resp.ok) {
+      const items = await resp.json();
+      newsCache[scId] = items;
+      return items;
+    }
+  } catch(e) {}
+  newsCache[scId] = [];
+  return [];
+}

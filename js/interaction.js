@@ -8,7 +8,7 @@ function checkHover() {
     document.getElementById('tt-name').textContent = scName || c.scId;
     document.getElementById('tt-meta').textContent = c.dish + ' \u2192 ' + c.station.name;
     document.getElementById('tt-detail').textContent = connectionDetail(c);
-    document.getElementById('tt-desc').textContent = '';
+    showNewsInTooltip(c.scId);
     tooltip.style.left = '50%';
     tooltip.style.transform = 'translateX(-50%)';
     tooltip.style.top = '70px';
@@ -35,7 +35,7 @@ function checkHover() {
     document.getElementById('tt-meta').textContent = found.dish + ' \u2192 ' + found.station.name;
 
     document.getElementById('tt-detail').textContent = connectionDetail(found);
-    document.getElementById('tt-desc').textContent = '';
+    showNewsInTooltip(found.scId);
 
     showTooltip();
     return;
@@ -53,7 +53,7 @@ function checkHover() {
     const p = hoveredPlanet;
     const planetData = PLANET_BY_NAME[p.name];
     document.getElementById('tt-name').textContent = p.name;
-    document.getElementById('tt-meta').textContent = formatDistance(planetData ? planetData.distance : 0) + ' from Earth (avg)';
+    document.getElementById('tt-meta').textContent = formatDistance(planetData ? planetData.distance : 0) + ' from Earth' + (planetDistancesLive ? '' : ' (avg)');
 
     const scList = p.spacecraft.map(id => spacecraftNames[id] || id);
     const active = p.spacecraft.filter(id =>
@@ -157,6 +157,68 @@ canvas.addEventListener('mouseleave', () => {
   mouseX = -1;
   tooltip.classList.remove('visible');
 });
+
+// ── News in Tooltip ─────────────────────────────────────────────────
+const MISSION_LINKS = {
+  JWST: 'nasa.gov/mission/webb', M20: 'nasa.gov/mission/mars-2020-perseverance',
+  MSL: 'nasa.gov/mission/msl-curiosity', JNO: 'nasa.gov/mission/juno',
+  VGR1: 'nasa.gov/mission/voyager-interstellar-mission', VGR2: 'nasa.gov/mission/voyager-interstellar-mission',
+  NHPC: 'nasa.gov/mission/new-horizons', SPP: 'nasa.gov/mission/parker-solar-probe',
+  MRO: 'nasa.gov/mission/mro', M01O: 'nasa.gov/mission/mars-odyssey',
+  MVN: 'nasa.gov/mission/maven', MEX: 'esa.int/mars-express',
+  TGO: 'esa.int/exomars-tgo', BEPI: 'esa.int/bepicolombo',
+  SOHO: 'nasa.gov/mission/soho', STA: 'nasa.gov/mission/stereo',
+  LRO: 'nasa.gov/mission/lro', KPLO: 'kari.re.kr',
+  CHDR: 'nasa.gov/mission/chandra', HST: 'nasa.gov/mission/hubble',
+  XMM: 'esa.int/xmm-newton', TESS: 'nasa.gov/mission/tess',
+  GAIA: 'esa.int/gaia', EURC: 'esa.int/euclid',
+  PSYC: 'nasa.gov/mission/psyche', LUCY: 'nasa.gov/mission/lucy',
+  DSCO: 'nasa.gov/mission/dscovr',
+};
+
+function showNewsInTooltip(scId) {
+  const desc = document.getElementById('tt-desc');
+  const missionLink = MISSION_LINKS[scId]
+    ? '<a href="https://' + MISSION_LINKS[scId] + '" target="_blank" rel="noopener">' + MISSION_LINKS[scId] + '</a>'
+    : '';
+  const cached = newsCache[scId];
+  if (cached && cached.length > 0) {
+    desc.innerHTML = formatNewsItem(cached[0]) + (missionLink ? '\n' + missionLink : '');
+  } else if (cached === undefined) {
+    desc.innerHTML = missionLink;
+    fetchNews(scId).then(items => {
+      if (items.length > 0) {
+        desc.innerHTML = formatNewsItem(items[0]) + (missionLink ? '\n' + missionLink : '');
+      }
+    });
+  } else {
+    desc.innerHTML = missionLink;
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatNewsItem(item) {
+  const ago = timeAgo(new Date(item.date));
+  const title = item.title.length > 60 ? item.title.slice(0, 57) + '...' : item.title;
+  const text = escapeHtml(title) + (ago ? ' \u00b7 ' + ago : '');
+  return '<a href="' + escapeHtml(item.link) + '" target="_blank" rel="noopener">' + text + '</a>';
+}
+
+function timeAgo(date) {
+  const ms = Date.now() - date.getTime();
+  if (isNaN(ms) || ms < 0) return '';
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return days + 'd ago';
+  const months = Math.floor(days / 30);
+  return months + 'mo ago';
+}
 
 // ── Touch Events ────────────────────────────────────────────────────
 function findNearestSpacecraft(x, y, radius) {

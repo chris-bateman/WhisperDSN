@@ -60,6 +60,7 @@ const PLANET_BY_NAME = {};
 PLANET_MARKERS.forEach(p => { PLANET_BY_NAME[p.name] = p; });
 
 let drawnPlanets = []; // { name, x, y, r, spacecraft: [scId, ...] }
+let planetDistancesLive = false; // true once Horizons data loads
 
 function resize() {
   W = canvas.width = window.innerWidth;
