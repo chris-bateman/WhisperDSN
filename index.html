@@ -357,7 +357,7 @@
 
 <div class="light-counter">
   <span class="light-value" id="data-rate-value">0</span>
-  <span class="light-label">bits/s from deep space</span>
+  <span class="light-label">MB/s from deep space</span>
   <br>
   <span class="light-value" id="power-value">0</span>
   <span class="light-label">kW beaming into space</span>
@@ -1682,9 +1682,9 @@ function draw(t) {
   // Smooth stat counters
   dataRateDisplay += (dataRateTarget - dataRateDisplay) * 0.05;
   powerDisplay += (powerTarget - powerDisplay) * 0.05;
-  const dr = dataRateDisplay;
+  const drBytes = dataRateDisplay / 8;
   document.getElementById('data-rate-value').textContent =
-    dr >= 1e6 ? (dr / 1e6).toFixed(1) + 'M' : dr >= 1e3 ? (dr / 1e3).toFixed(1) + 'k' : Math.round(dr).toLocaleString();
+    drBytes >= 1e6 ? (drBytes / 1e6).toFixed(1) : drBytes >= 1e3 ? (drBytes / 1e3).toFixed(0) + 'k' : Math.round(drBytes).toLocaleString();
   document.getElementById('power-value').textContent = powerDisplay.toFixed(1);
 
   // Planet markers (drawn behind connection lines)
