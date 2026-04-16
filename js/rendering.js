@@ -22,27 +22,30 @@ function drawStarfield(t) {
 }
 
 // ── Distance Reference Lines ────────────────────────────────────────
-// slot: 0 = top of sky (furthest), 1 = bottom of sky (closest to stations)
 const DISTANCE_MARKERS = [
-  { label: 'Heliopause',    distance: 18e9,      color: '100,100,120', slot: 0.00 },
-  { label: 'Neptune',       distance: 4.5e9,     color: '74,111,165',  slot: 0.10 },
-  { label: 'Uranus',        distance: 2.87e9,    color: '107,181,201', slot: 0.18 },
-  { label: 'Saturn',        distance: 1.4e9,     color: '212,184,106', slot: 0.27 },
-  { label: 'Jupiter',       distance: 778e6,     color: '200,165,90',  slot: 0.37 },
-  { label: 'Mars',          distance: 225e6,     color: '192,96,58',   slot: 0.50 },
-  { label: 'Mercury',       distance: 91.7e6,    color: '140,126,109', slot: 0.60 },
-  { label: 'Venus',         distance: 41.4e6,    color: '201,169,110', slot: 0.70 },
-  { label: 'Moon',          distance: 384400,    color: '160,170,180', slot: 0.90 },
+  { label: 'Heliopause',    distance: 18e9,      color: '100,100,120' },
+  { label: 'Neptune',       distance: 4.5e9,     color: '74,111,165' },
+  { label: 'Uranus',        distance: 2.87e9,    color: '107,181,201' },
+  { label: 'Saturn',        distance: 1.4e9,     color: '212,184,106' },
+  { label: 'Jupiter',       distance: 778e6,     color: '200,165,90' },
+  { label: 'Mars',          distance: 225e6,     color: '192,96,58' },
+  { label: 'Mercury',       distance: 91.7e6,    color: '140,126,109' },
+  { label: 'Venus',         distance: 41.4e6,    color: '201,169,110' },
+  { label: 'Moon',          distance: 384400,    color: '160,170,180' },
 ];
 
 function drawDistanceMarkers() {
   const headerFloor = isMobile ? 100 : 75;
   const skyTop = Math.max(H * (isMobile ? 0.12 : 0.06), headerFloor);
   const skyBottom = H * (isMobile || isShortScreen ? 0.58 : 0.78);
+  const maxLog = Math.log10(Math.max(currentMaxRange, 100));
 
   DISTANCE_MARKERS.forEach(m => {
     if (m.distance > currentMaxRange * 2) return;
-    const y = skyTop + m.slot * (skyBottom - skyTop);
+    // Same log scale as spacecraft layout
+    const logDist = Math.log10(Math.max(m.distance, 100));
+    const yRatio = 1 - (logDist / maxLog);
+    const y = skyTop + yRatio * (skyBottom - skyTop);
     if (y < headerFloor || y > H * 0.95) return;
 
     // Arc across full width
