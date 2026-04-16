@@ -356,8 +356,11 @@
 </div>
 
 <div class="light-counter">
-  <span class="light-value" id="light-value">0</span>
-  <span class="light-label">seconds of light travelling</span>
+  <span class="light-value" id="data-rate-value">0</span>
+  <span class="light-label">bits/s from deep space</span>
+  <br>
+  <span class="light-value" id="power-value">0</span>
+  <span class="light-label">kW beaming into space</span>
 </div>
 
 <div class="source-link">
@@ -431,7 +434,8 @@ let connections = [];
 let particles = [];
 let stars = [];
 let mouseX = -1, mouseY = -1;
-let lightTarget = 0, lightDisplay = 0;
+let dataRateTarget = 0, dataRateDisplay = 0;
+let powerTarget = 0, powerDisplay = 0;
 let isMobile = false;
 let isShortScreen = false;
 let activeTooltipConn = null;
@@ -823,6 +827,7 @@ function parseDSN(xml) {
       newConnections.push({
         station: stationPos, dish: dishName, scId, range, rtlt,
         hasActiveUp, hasActiveDown, activity, dataRate: maxDataRate, band,
+        upPower: scUpArr.reduce((max, s) => Math.max(max, parseFloat(s.getAttribute('power')) || 0), 0),
         azimuth, elevation,
         targetX: 0, targetY: 0, renderX: 0, renderY: 0,
       });
@@ -873,6 +878,7 @@ function parseDSNJSON(data) {
           activity: dish.activity,
           dataRate: target.dataRate,
           band: target.band || '',
+          upPower: target.upPower || 0,
           azimuth: dish.azimuth || 0,
           elevation: dish.elevation || 0,
           targetX: 0, targetY: 0, renderX: 0, renderY: 0,
@@ -1002,10 +1008,13 @@ function layoutConnections(newConnections) {
   const activeCount = conns.filter(c => c.hasActiveUp || c.hasActiveDown).length;
   document.getElementById('active-count').textContent = activeCount + ' active links';
 
-  // Update light travelling target
-  lightTarget = conns
-    .filter(c => c.hasActiveUp || c.hasActiveDown)
-    .reduce((sum, c) => sum + (c.rtlt > 0 ? c.rtlt / 2 : 0), 0);
+  // Update data rate and power stats
+  dataRateTarget = conns
+    .filter(c => c.hasActiveDown)
+    .reduce((sum, c) => sum + (c.dataRate || 0), 0);
+  powerTarget = conns
+    .filter(c => c.hasActiveUp)
+    .reduce((sum, c) => sum + (c.upPower || 0), 0);
 }
 
 // ── Signal Waveform ─────────────────────────────────────────────────
@@ -1670,9 +1679,13 @@ function draw(t) {
     c.renderY += (c.targetY - c.renderY) * 0.05;
   });
 
-  // Smooth light counter
-  lightDisplay += (lightTarget - lightDisplay) * 0.05;
-  document.getElementById('light-value').textContent = Math.round(lightDisplay).toLocaleString();
+  // Smooth stat counters
+  dataRateDisplay += (dataRateTarget - dataRateDisplay) * 0.05;
+  powerDisplay += (powerTarget - powerDisplay) * 0.05;
+  const dr = dataRateDisplay;
+  document.getElementById('data-rate-value').textContent =
+    dr >= 1e6 ? (dr / 1e6).toFixed(1) + 'M' : dr >= 1e3 ? (dr / 1e3).toFixed(1) + 'k' : Math.round(dr).toLocaleString();
+  document.getElementById('power-value').textContent = powerDisplay.toFixed(1);
 
   // Planet markers (drawn behind connection lines)
   drawPlanetMarkers();
