@@ -23,7 +23,7 @@ function drawStarfield(t) {
 
 // ── Distance Reference Lines ────────────────────────────────────────
 const DISTANCE_MARKERS = [
-  { label: 'Moon',          distance: 384400,   color: '160,170,180' },
+  { label: 'Moon',          distance: 384400,   color: '160,170,180', fixedY: 0.79 },
   { label: 'Venus',         distance: 41.4e6,   color: '201,169,110' },
   { label: 'Mercury',       distance: 91.7e6,   color: '140,126,109' },
   { label: 'Mars',          distance: 225e6,     color: '192,96,58' },
@@ -46,12 +46,18 @@ function drawDistanceMarkers() {
 
   DISTANCE_MARKERS.forEach(m => {
     if (m.distance > currentMaxRange * 2) return;
-    const logDist = Math.log10(m.distance);
-    const yRatio = 1 - (logDist / maxLog);
-    const y = skyTop + yRatio * (skyBottom - skyTop);
+    let y;
+    if (m.fixedY !== undefined) {
+      // Fixed position (e.g. Moon rendered close to stations)
+      y = H * m.fixedY;
+    } else {
+      const logDist = Math.log10(m.distance);
+      const yRatio = 1 - (logDist / maxLog);
+      y = skyTop + yRatio * (skyBottom - skyTop);
+    }
     // Hard floor: never render in the header zone (title + status bar)
     const headerFloor = isMobile ? 100 : 75;
-    if (y < headerFloor || y > skyBottom + 5) return;
+    if (y < headerFloor || y > H * 0.95) return;
 
     // Arc across full width
     const bowDepth = isMobile ? 4 : 8;
