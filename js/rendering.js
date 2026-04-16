@@ -22,41 +22,27 @@ function drawStarfield(t) {
 }
 
 // ── Distance Reference Lines ────────────────────────────────────────
+// slot: 0 = top of sky (furthest), 1 = bottom of sky (closest to stations)
 const DISTANCE_MARKERS = [
-  { label: 'Moon',          distance: 384400,   color: '160,170,180', fixedY: 0.79 },
-  { label: 'Venus',         distance: 41.4e6,   color: '201,169,110' },
-  { label: 'Mercury',       distance: 91.7e6,   color: '140,126,109' },
-  { label: 'Mars',          distance: 225e6,     color: '192,96,58' },
-  { label: 'Jupiter',       distance: 778e6,     color: '200,165,90' },
-  { label: 'Saturn',        distance: 1.4e9,     color: '212,184,106' },
-  { label: 'Uranus',        distance: 2.87e9,    color: '107,181,201' },
-  { label: 'Neptune',       distance: 4.5e9,     color: '74,111,165' },
-  { label: 'Heliopause',    distance: 18e9,      color: '100,100,120' },
+  { label: 'Heliopause',    distance: 18e9,      color: '100,100,120', slot: 0.00 },
+  { label: 'Neptune',       distance: 4.5e9,     color: '74,111,165',  slot: 0.10 },
+  { label: 'Uranus',        distance: 2.87e9,    color: '107,181,201', slot: 0.18 },
+  { label: 'Saturn',        distance: 1.4e9,     color: '212,184,106', slot: 0.27 },
+  { label: 'Jupiter',       distance: 778e6,     color: '200,165,90',  slot: 0.37 },
+  { label: 'Mars',          distance: 225e6,     color: '192,96,58',   slot: 0.50 },
+  { label: 'Mercury',       distance: 91.7e6,    color: '140,126,109', slot: 0.60 },
+  { label: 'Venus',         distance: 41.4e6,    color: '201,169,110', slot: 0.70 },
+  { label: 'Moon',          distance: 384400,    color: '160,170,180', slot: 0.90 },
 ];
 
 function drawDistanceMarkers() {
   const headerFloor = isMobile ? 100 : 75;
   const skyTop = Math.max(H * (isMobile ? 0.12 : 0.06), headerFloor);
   const skyBottom = H * (isMobile || isShortScreen ? 0.58 : 0.78);
-  const maxLog = Math.log10(Math.max(currentMaxRange, 100));
-
-  // Title card occupies top-left; status bar occupies top-right
-  // Place labels at ~40% from right — clear of both
-  const labelX = W * 0.62;
 
   DISTANCE_MARKERS.forEach(m => {
     if (m.distance > currentMaxRange * 2) return;
-    let y;
-    if (m.fixedY !== undefined) {
-      // Fixed position (e.g. Moon rendered close to stations)
-      y = H * m.fixedY;
-    } else {
-      const logDist = Math.log10(m.distance);
-      const yRatio = 1 - (logDist / maxLog);
-      y = skyTop + yRatio * (skyBottom - skyTop);
-    }
-    // Hard floor: never render in the header zone (title + status bar)
-    const headerFloor = isMobile ? 100 : 75;
+    const y = skyTop + m.slot * (skyBottom - skyTop);
     if (y < headerFloor || y > H * 0.95) return;
 
     // Arc across full width
@@ -68,18 +54,12 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label with dark backing for readability
+    // Label at the right end of the arc
     const fontSize = isMobile ? 7 : 8;
     ctx.font = fontSize + 'px "JetBrains Mono"';
-    const textW = ctx.measureText(m.label).width;
-    const ly = y + bowDepth * (labelX / W) * (1 - labelX / W) * 4; // match arc curve
-
-    ctx.fillStyle = '#05070a';
-    ctx.fillRect(labelX - 4, ly - fontSize, textW + 8, fontSize + 3);
-
-    ctx.fillStyle = `rgba(${m.color},0.35)`;
-    ctx.textAlign = 'left';
-    ctx.fillText(m.label, labelX, ly);
+    ctx.fillStyle = `rgba(${m.color},0.3)`;
+    ctx.textAlign = 'right';
+    ctx.fillText(m.label, W - 6, y - 3);
   });
 }
 
