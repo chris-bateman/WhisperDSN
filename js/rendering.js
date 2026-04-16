@@ -29,6 +29,7 @@ const DISTANCE_MARKERS = [
   { label: 'Saturn',        distance: 1.4e9,     color: '212,184,106' },
   { label: 'Jupiter',       distance: 778e6,     color: '200,165,90' },
   { label: 'Mars',          distance: 225e6,     color: '192,96,58' },
+  { label: 'Sun',           distance: 150e6,     color: '255,200,60' },
   { label: 'Mercury',       distance: 91.7e6,    color: '140,126,109' },
   { label: 'Venus',         distance: 41.4e6,    color: '201,169,110' },
   { label: 'Moon',          distance: 384400,    color: '160,170,180' },

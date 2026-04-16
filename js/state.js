@@ -36,6 +36,7 @@ const PLANET_MARKERS = [
   { name: 'Venus',   distance: 41.4e6,  color: '#c9a96e', radius: 3.5 },
   { name: 'Moon',    distance: 384400,   color: '#a0a0a0', radius: 2 },
   { name: 'Mars',    distance: 225e6,    color: '#c0603a', radius: 3 },
+  { name: 'Sun',     distance: 150e6,    color: '#ffc83c', radius: 5 },
   { name: 'Jupiter', distance: 778e6,    color: '#c8a55a', radius: 6 },
   { name: 'Saturn',  distance: 1.4e9,    color: '#d4b86a', radius: 5, ring: true },
   { name: 'Uranus',  distance: 2.87e9,   color: '#6bb5c9', radius: 4 },
@@ -52,6 +53,8 @@ const SC_PLANET = {
   LRO: 'Moon', KPLO: 'Moon', CH3: 'Moon',
   // Mercury orbiter
   BEPI: 'Mercury',
+  // Solar orbiters
+  SOHO: 'Sun', SPP: 'Sun', STA: 'Sun',
 };
 const PLANET_BY_NAME = {};
 PLANET_MARKERS.forEach(p => { PLANET_BY_NAME[p.name] = p; });
