@@ -35,17 +35,25 @@ const DISTANCE_MARKERS = [
 ];
 
 function drawDistanceMarkers() {
-  const skyTop = H * (isMobile ? 0.12 : 0.06);
-  const skyBottom = H * (isMobile || isShortScreen ? 0.55 : 0.75);
+  const headerFloor = isMobile ? 100 : 75;
+  const skyTop = Math.max(H * (isMobile ? 0.12 : 0.06), headerFloor);
+  const skyBottom = H * (isMobile || isShortScreen ? 0.58 : 0.78);
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
+
+  // Title card occupies top-left; status bar occupies top-right
+  // Place labels at ~40% from right — clear of both
+  const labelX = W * 0.62;
+
   DISTANCE_MARKERS.forEach(m => {
     if (m.distance > currentMaxRange * 2) return;
     const logDist = Math.log10(m.distance);
     const yRatio = 1 - (logDist / maxLog);
     const y = skyTop + yRatio * (skyBottom - skyTop);
-    if (y < skyTop - 5 || y > skyBottom + 5) return;
+    // Hard floor: never render in the header zone (title + status bar)
+    const headerFloor = isMobile ? 100 : 75;
+    if (y < headerFloor || y > skyBottom + 5) return;
 
-    // Gentle arc across full width
+    // Arc across full width
     const bowDepth = isMobile ? 4 : 8;
     ctx.beginPath();
     ctx.moveTo(0, y);
@@ -54,12 +62,18 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label on left edge
+    // Label with dark backing for readability
     const fontSize = isMobile ? 7 : 8;
     ctx.font = fontSize + 'px "JetBrains Mono"';
-    ctx.fillStyle = `rgba(${m.color},0.25)`;
+    const textW = ctx.measureText(m.label).width;
+    const ly = y + bowDepth * (labelX / W) * (1 - labelX / W) * 4; // match arc curve
+
+    ctx.fillStyle = '#05070a';
+    ctx.fillRect(labelX - 4, ly - fontSize, textW + 8, fontSize + 3);
+
+    ctx.fillStyle = `rgba(${m.color},0.35)`;
     ctx.textAlign = 'left';
-    ctx.fillText(m.label, 8, y - 4);
+    ctx.fillText(m.label, labelX, ly);
   });
 }
 
