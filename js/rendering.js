@@ -38,17 +38,12 @@ function drawDistanceMarkers() {
   const skyTop = H * (isMobile ? 0.12 : 0.06);
   const skyBottom = H * (isMobile || isShortScreen ? 0.55 : 0.75);
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
-  const minGap = isMobile ? 18 : 22;
-  let lastY = -100;
-
   DISTANCE_MARKERS.forEach(m => {
     if (m.distance > currentMaxRange * 2) return;
     const logDist = Math.log10(m.distance);
     const yRatio = 1 - (logDist / maxLog);
     const y = skyTop + yRatio * (skyBottom - skyTop);
     if (y < skyTop - 5 || y > skyBottom + 5) return;
-    if (Math.abs(y - lastY) < minGap) return;
-    lastY = y;
 
     // Gentle arc across full width
     const bowDepth = isMobile ? 4 : 8;
@@ -59,14 +54,12 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label on left edge, only if below the title card area
-    if (y > (isMobile ? H * 0.14 : 70)) {
-      const fontSize = isMobile ? 7 : 8;
-      ctx.font = fontSize + 'px "JetBrains Mono"';
-      ctx.fillStyle = `rgba(${m.color},0.25)`;
-      ctx.textAlign = 'left';
-      ctx.fillText(m.label, 8, y - 4);
-    }
+    // Label on left edge
+    const fontSize = isMobile ? 7 : 8;
+    ctx.font = fontSize + 'px "JetBrains Mono"';
+    ctx.fillStyle = `rgba(${m.color},0.25)`;
+    ctx.textAlign = 'left';
+    ctx.fillText(m.label, 8, y - 4);
   });
 }
 
