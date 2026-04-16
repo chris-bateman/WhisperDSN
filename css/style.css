@@ -111,6 +111,7 @@ canvas { display: block; touch-action: manipulation; }
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 .sc-tooltip.visible { opacity: 1; }
+.sc-tooltip.has-links { pointer-events: auto; }
 .sc-tooltip .sc-name {
   font-family: 'DM Serif Display', serif;
   font-size: 16px;

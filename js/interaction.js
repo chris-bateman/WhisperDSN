@@ -129,9 +129,21 @@ function checkHover() {
     return;
   }
 
-  tooltip.classList.remove('visible');
+  if (!tooltipHovered) {
+    if (tooltip.classList.contains('has-links')) {
+      if (!tooltipHideTimer) {
+        tooltipHideTimer = setTimeout(() => {
+          if (!tooltipHovered) tooltip.classList.remove('visible', 'has-links');
+          tooltipHideTimer = null;
+        }, 300);
+      }
+    } else {
+      tooltip.classList.remove('visible');
+    }
+  }
 
   function showTooltip() {
+    if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
     if (isMobile) {
       tooltip.style.left = '50%';
       tooltip.style.transform = 'translateX(-50%)';
@@ -153,9 +165,28 @@ canvas.addEventListener('mousemove', e => {
   mouseX = e.clientX;
   mouseY = e.clientY;
 });
+let tooltipHideTimer = null;
+let tooltipHovered = false;
+
+tooltip.addEventListener('mouseenter', () => {
+  tooltipHovered = true;
+  if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
+});
+tooltip.addEventListener('mouseleave', () => {
+  tooltipHovered = false;
+  tooltip.classList.remove('visible', 'has-links');
+});
+
 canvas.addEventListener('mouseleave', () => {
   mouseX = -1;
-  tooltip.classList.remove('visible');
+  if (tooltip.classList.contains('has-links')) {
+    tooltipHideTimer = setTimeout(() => {
+      if (!tooltipHovered) tooltip.classList.remove('visible', 'has-links');
+      tooltipHideTimer = null;
+    }, 300);
+  } else {
+    tooltip.classList.remove('visible');
+  }
 });
 
 // ── News in Tooltip ─────────────────────────────────────────────────
@@ -190,10 +221,17 @@ function showNewsInTooltip(scId) {
       if (items.length > 0) {
         desc.innerHTML = formatNewsItem(items[0]) + (missionLink ? '\n' + missionLink : '');
       }
+      updateTooltipLinks();
     });
   } else {
     desc.innerHTML = missionLink;
   }
+  updateTooltipLinks();
+}
+
+function updateTooltipLinks() {
+  const hasLinks = tooltip.querySelector('.sc-desc a');
+  tooltip.classList.toggle('has-links', !!hasLinks);
 }
 
 function escapeHtml(s) {
