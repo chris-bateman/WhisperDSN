@@ -7,7 +7,7 @@
 
 const DSN_URL = 'https://eyes.jpl.nasa.gov/dsn/data/dsn.xml';
 const CONFIG_URL = 'https://eyes.nasa.gov/apps/dsn-now/config.xml';
-const DSN_CACHE_SECONDS = 5;
+const DSN_CACHE_SECONDS = 10;
 const CONFIG_CACHE_SECONDS = 86400; // 24 hours
 const DISTANCES_CACHE_SECONDS = 86400; // 24 hours
 const NEWS_CACHE_SECONDS = 14400; // 4 hours
@@ -99,7 +99,7 @@ async function handleDSN(request, corsHeaders) {
     const xml = await resp.text();
     const data = parseXML(xml);
     const response = jsonResponse(data, 200, corsHeaders, {
-      'Cache-Control': `public, max-age=${DSN_CACHE_SECONDS}`,
+      'Cache-Control': `public, max-age=${DSN_CACHE_SECONDS}, stale-while-revalidate=${DSN_CACHE_SECONDS}`,
     });
 
     await cache.put(cacheKey, response.clone());
@@ -128,7 +128,7 @@ async function handleSpacecraft(request, corsHeaders) {
     const xml = await resp.text();
     const spacecraft = parseConfig(xml);
     const response = jsonResponse(spacecraft, 200, corsHeaders, {
-      'Cache-Control': `public, max-age=${CONFIG_CACHE_SECONDS}`,
+      'Cache-Control': `public, max-age=${CONFIG_CACHE_SECONDS}, stale-while-revalidate=3600`,
     });
 
     await cache.put(cacheKey, response.clone());
@@ -148,10 +148,9 @@ async function handleDistances(request, corsHeaders) {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    const distances = {};
-
-    for (const [name, id] of Object.entries(HORIZONS_BODIES)) {
-      try {
+    const entries = Object.entries(HORIZONS_BODIES);
+    const results = await Promise.allSettled(
+      entries.map(async ([name, id]) => {
         const params = new URLSearchParams({
           format: 'json', COMMAND: `'${id}'`, OBJ_DATA: "'NO'",
           MAKE_EPHEM: "'YES'", EPHEM_TYPE: "'OBSERVER'", CENTER: "'500@399'",
@@ -161,20 +160,28 @@ async function handleDistances(request, corsHeaders) {
         const resp = await fetch(`${HORIZONS_URL}?${params}`, {
           headers: { 'User-Agent': 'WhisperDSN/1.0' },
         });
-        if (!resp.ok) continue;
+        if (!resp.ok) return null;
         const data = await resp.json();
         const text = data.result || '';
         const soeIdx = text.indexOf('$$SOE');
         const eoeIdx = text.indexOf('$$EOE');
-        if (soeIdx < 0 || eoeIdx < 0) continue;
+        if (soeIdx < 0 || eoeIdx < 0) return null;
         const line = text.substring(soeIdx + 5, eoeIdx).trim().split('\n')[0];
         const delta = parseFloat(line.trim().split(/\s+/)[2]);
-        if (!isNaN(delta)) distances[name] = Math.round(delta * AU_TO_KM);
-      } catch (_) { /* skip this body */ }
+        if (isNaN(delta)) return null;
+        return [name, Math.round(delta * AU_TO_KM)];
+      })
+    );
+
+    const distances = {};
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value) {
+        distances[r.value[0]] = r.value[1];
+      }
     }
 
     const response = jsonResponse(distances, 200, corsHeaders, {
-      'Cache-Control': `public, max-age=${DISTANCES_CACHE_SECONDS}`,
+      'Cache-Control': `public, max-age=${DISTANCES_CACHE_SECONDS}, stale-while-revalidate=3600`,
     });
     await cache.put(cacheKey, response.clone());
     return response;
@@ -206,7 +213,7 @@ async function handleNews(request, url, corsHeaders) {
     const items = parseRSS(xml);
 
     const response = jsonResponse(items, 200, corsHeaders, {
-      'Cache-Control': `public, max-age=${NEWS_CACHE_SECONDS}`,
+      'Cache-Control': `public, max-age=${NEWS_CACHE_SECONDS}, stale-while-revalidate=1800`,
     });
     await cache.put(cacheKey, response.clone());
     return response;
