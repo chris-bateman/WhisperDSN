@@ -512,6 +512,7 @@ function connectionDetail(c) {
   let d = 'Distance: ' + formatDistance(c.range) + '\n';
   d += 'Light time: ' + formatLightTime(c.rtlt) + '\n';
   if (c.dataRate > 0) d += 'Data rate: ' + (c.dataRate / 1000).toFixed(1) + ' kb/s\n';
+  if (c.azimuth > 0 || c.elevation > 0) d += 'Dish pointing: ' + c.azimuth.toFixed(0) + '\u00B0 az, ' + c.elevation.toFixed(0) + '\u00B0 el\n';
   d += 'Band: ' + c.activity;
   return d;
 }
@@ -578,6 +579,8 @@ function parseDSN(xml) {
 
     const dishName = dish.getAttribute('name');
     const activity = dish.getAttribute('activity');
+    const azimuth = parseFloat(dish.getAttribute('azimuthAngle')) || 0;
+    const elevation = parseFloat(dish.getAttribute('elevationAngle')) || 0;
     const targets = dish.querySelectorAll('target');
     const upSignals = dish.querySelectorAll('upSignal');
     const downSignals = dish.querySelectorAll('downSignal');
@@ -601,6 +604,7 @@ function parseDSN(xml) {
       newConnections.push({
         station: stationPos, dish: dishName, scId, range, rtlt,
         hasActiveUp, hasActiveDown, activity, dataRate: maxDataRate,
+        azimuth, elevation,
         targetX: 0, targetY: 0, renderX: 0, renderY: 0,
       });
     });
@@ -649,6 +653,8 @@ function parseDSNJSON(data) {
           hasActiveDown: target.downSignalActive,
           activity: dish.activity,
           dataRate: target.dataRate,
+          azimuth: dish.azimuth || 0,
+          elevation: dish.elevation || 0,
           targetX: 0, targetY: 0, renderX: 0, renderY: 0,
         });
       });
@@ -669,6 +675,7 @@ function layoutConnections(newConnections) {
       stationId: c.station.id, dish: c.dish,
       hasActiveUp: c.hasActiveUp, hasActiveDown: c.hasActiveDown,
       activity: c.activity, dataRate: c.dataRate,
+      azimuth: c.azimuth, elevation: c.elevation,
     };
   });
   saveSeen(seen);
@@ -684,6 +691,7 @@ function layoutConnections(newConnections) {
       range: data.range, rtlt: data.rtlt,
       hasActiveUp: false, hasActiveDown: false,
       activity: data.activity || '', dataRate: 0,
+      azimuth: data.azimuth || 0, elevation: data.elevation || 0,
       targetX: 0, targetY: 0, renderX: 0, renderY: 0,
       stale: true,
     });
@@ -704,24 +712,22 @@ function layoutConnections(newConnections) {
 
   const stationIds = Object.keys(byStation);
   Object.entries(byStation).forEach(([sid, group]) => {
-    group.sort((a, b) => a.range - b.range);
-    const n = group.length;
     const stationX = group[0].station.x;
-    // Mobile: each station gets its own horizontal zone to prevent overlap
+    // Mobile: each station gets its own horizontal zone
     const fanCenterX = isMobile ? W * ((stationIds.indexOf(sid) + 0.5) / stationIds.length) : stationX;
     const spread = isMobile ? W * (0.7 / stationIds.length) : W * 0.25;
 
-    group.forEach((c, i) => {
+    group.forEach(c => {
       // Vertical: log-scale distance
       const logDist = Math.log10(Math.max(c.range, 100));
       const maxLog = Math.log10(Math.max(maxRange, 100));
       const yRatio = 1 - (logDist / maxLog);
       c.targetY = skyTop + yRatio * (skyBottom - skyTop);
 
-      // Horizontal: even fan from station center
-      const slot = n > 1 ? (i / (n - 1)) - 0.5 : 0;
-      const hashJitter = ((hashCode(c.scId + c.dish) % 50) / 50 - 0.5) * 30;
-      c.targetX = Math.min(W - 60, Math.max(60, fanCenterX + slot * spread + hashJitter));
+      // Horizontal: dish azimuth mapped to spread zone
+      // Azimuth 0-360° → -0.5 to +0.5 offset from center
+      const azNorm = ((c.azimuth % 360) / 360 - 0.5);
+      c.targetX = Math.min(W - 60, Math.max(60, fanCenterX + azNorm * spread));
     });
   });
 

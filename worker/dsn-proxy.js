@@ -173,20 +173,13 @@ function parseXML(xml) {
       const dish = {
         name: dishAttrs.name || '',
         activity: dishAttrs.activity || '',
+        azimuth: parseFloat(dishAttrs.azimuthAngle) || 0,
+        elevation: parseFloat(dishAttrs.elevationAngle) || 0,
         targets: [],
       };
 
       const upSignals = parseSignals(dishBody, 'upSignal');
       const downSignals = parseSignals(dishBody, 'downSignal');
-
-      const hasActiveUp = upSignals.some(s => s.active === 'true');
-      const hasActiveDown = downSignals.some(s => s.active === 'true');
-
-      const allSignals = [...upSignals, ...downSignals];
-      const maxDataRate = allSignals.reduce((max, s) => {
-        const rate = parseFloat(s.dataRate) || 0;
-        return rate > max ? rate : max;
-      }, 0);
 
       const targetRegex = /<target\s+([^>]+)\/>/g;
       let targetMatch;
@@ -199,13 +192,17 @@ function parseXML(xml) {
         if (['DSN', 'DSS', 'GBRA', 'TEST', 'DOUG', 'SHAN'].includes(id)) continue;
         if (range <= 0) continue;
 
+        const scUp = upSignals.filter(s => s.spacecraft === id);
+        const scDown = downSignals.filter(s => s.spacecraft === id);
+        const scAll = [...scUp, ...scDown];
+
         dish.targets.push({
           id,
           downlegRange: range,
           rtlt,
-          upSignalActive: hasActiveUp,
-          downSignalActive: hasActiveDown,
-          dataRate: maxDataRate,
+          upSignalActive: scUp.some(s => s.active === 'true'),
+          downSignalActive: scDown.some(s => s.active === 'true'),
+          dataRate: scAll.reduce((max, s) => Math.max(max, parseFloat(s.dataRate) || 0), 0),
         });
       }
 
