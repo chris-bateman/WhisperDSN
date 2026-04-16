@@ -12,7 +12,8 @@ function connectionDetail(c) {
   d += 'Light time: ' + formatLightTime(c.rtlt) + '\n';
   if (c.dataRate > 0) d += 'Data rate: ' + (c.dataRate / 1000).toFixed(1) + ' kb/s\n';
   if (c.azimuth > 0 || c.elevation > 0) d += 'Dish pointing: ' + c.azimuth.toFixed(0) + '\u00B0 az, ' + c.elevation.toFixed(0) + '\u00B0 el\n';
-  d += 'Band: ' + c.activity;
+  if (c.band) d += 'Band: ' + c.band + '\n';
+  d += 'Activity: ' + c.activity;
   return d;
 }
 

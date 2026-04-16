@@ -146,6 +146,7 @@ function draw(t) {
   });
 
   // Draw stations and dishes
+  const seen = loadSeen();
   stationPositions.forEach(s => {
     const dishes = stationDishes[s.id] || [];
     const info = stationInfo[s.id];
@@ -195,7 +196,6 @@ function draw(t) {
     ctx.fillText(locLine, s.x, s.y + 38);
 
     // Last tracked spacecraft at this station
-    const seen = loadSeen();
     const stationSeen = Object.entries(seen)
       .filter(([, d]) => d.stationId === s.id)
       .sort((a, b) => b[1].ts - a[1].ts);

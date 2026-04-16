@@ -16,7 +16,7 @@ function loadSeen() {
     });
     _seenCache = data;
     return data;
-  } catch(e) { return {}; }
+  } catch(e) { _seenCache = {}; return _seenCache; }
 }
 
 function saveSeen(seen) {
