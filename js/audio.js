@@ -44,7 +44,8 @@ function createReverb(ctx) {
 }
 
 const audioToggle = document.getElementById('audio-toggle');
-audioToggle.addEventListener('click', () => {
+
+function toggleAudio() {
   audioEnabled = !audioEnabled;
   audioToggle.classList.toggle('active', audioEnabled);
   if (audioEnabled) {
@@ -62,6 +63,12 @@ audioToggle.addEventListener('click', () => {
   } else {
     stopAllAudio();
   }
+}
+
+audioToggle.addEventListener('click', toggleAudio);
+audioToggle.addEventListener('touchend', e => {
+  e.preventDefault();
+  toggleAudio();
 });
 
 function createVoice(freq) {
