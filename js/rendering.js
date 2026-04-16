@@ -41,6 +41,9 @@ function drawDistanceMarkers() {
   const skyBottom = H * (isMobile ? 0.75 : isShortScreen ? 0.58 : 0.78);
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
 
+  let lastLabelY = -Infinity;
+  const minLabelGap = isMobile ? 12 : 10;
+
   DISTANCE_MARKERS.forEach(m => {
     if (m.distance > currentMaxRange * 2) return;
     // Same log scale as spacecraft layout
@@ -58,7 +61,9 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label — left side, past the title card
+    // Label — skip if too close to the previous label
+    if (Math.abs(y - lastLabelY) < minLabelGap) return;
+    lastLabelY = y;
     const fontSize = isMobile ? 7 : 8;
     ctx.font = fontSize + 'px "JetBrains Mono"';
     ctx.fillStyle = `rgba(${m.color},0.3)`;
