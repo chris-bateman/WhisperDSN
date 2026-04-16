@@ -492,6 +492,49 @@ function drawStarfield(t) {
   });
 }
 
+// ── Distance Reference Lines ────────────────────────────────────────
+const DISTANCE_MARKERS = [
+  { label: 'Moon',          distance: 384400,   color: '160,170,180' },
+  { label: 'Venus',         distance: 41.4e6,   color: '201,169,110' },
+  { label: 'Mercury',       distance: 91.7e6,   color: '140,126,109' },
+  { label: 'Mars',          distance: 225e6,     color: '192,96,58' },
+  { label: 'Jupiter',       distance: 778e6,     color: '200,165,90' },
+  { label: 'Saturn',        distance: 1.4e9,     color: '212,184,106' },
+  { label: 'Uranus',        distance: 2.87e9,    color: '107,181,201' },
+  { label: 'Neptune',       distance: 4.5e9,     color: '74,111,165' },
+  { label: 'Heliopause',    distance: 18e9,      color: '100,100,120' },
+];
+
+function drawDistanceMarkers() {
+  const skyTop = H * (isMobile ? 0.12 : 0.06);
+  const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
+  const maxLog = Math.log10(Math.max(currentMaxRange, 100));
+
+  DISTANCE_MARKERS.forEach(m => {
+    if (m.distance > currentMaxRange * 2) return;
+    const logDist = Math.log10(m.distance);
+    const yRatio = 1 - (logDist / maxLog);
+    const y = skyTop + yRatio * (skyBottom - skyTop);
+    if (y < skyTop - 5 || y > skyBottom + 5) return;
+
+    // Dashed line
+    ctx.beginPath();
+    ctx.setLineDash([2, 6]);
+    ctx.moveTo(isMobile ? 8 : 14, y);
+    ctx.lineTo(W - (isMobile ? 8 : 14), y);
+    ctx.strokeStyle = `rgba(${m.color},0.07)`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label on left
+    ctx.font = (isMobile ? '7' : '8') + 'px "JetBrains Mono"';
+    ctx.fillStyle = `rgba(${m.color},0.25)`;
+    ctx.textAlign = 'left';
+    ctx.fillText(m.label, isMobile ? 4 : 8, y - 4);
+  });
+}
+
 // Map spacecraft in permanent orbit or on the surface to their parent body
 const SC_PLANET = {
   // Mars orbiters + rovers
@@ -1660,6 +1703,9 @@ function draw(t) {
 
   // Starfield
   drawStarfield(t);
+
+  // Distance reference lines
+  drawDistanceMarkers();
 
   // Drifting asteroid easter egg hint
   updateEasterRock();
