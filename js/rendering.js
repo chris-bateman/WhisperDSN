@@ -36,7 +36,7 @@ const DISTANCE_MARKERS = [
 
 function drawDistanceMarkers() {
   const skyTop = H * (isMobile ? 0.12 : 0.06);
-  const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
+  const skyBottom = H * (isMobile || isShortScreen ? 0.50 : 0.68);
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
   const minGap = isMobile ? 18 : 22;
   let lastY = -100;
@@ -50,8 +50,8 @@ function drawDistanceMarkers() {
     if (Math.abs(y - lastY) < minGap) return;
     lastY = y;
 
-    // Gentle arc across full width — bows down slightly in the center
-    const bowDepth = isMobile ? 6 : 10;
+    // Gentle arc across full width
+    const bowDepth = isMobile ? 4 : 8;
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.quadraticCurveTo(W / 2, y + bowDepth, W, y);
@@ -59,21 +59,13 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label centered on the arc, with a gap cleared behind it
+    // Label on right edge — avoids spacecraft in center
     const label = m.label;
-    const fontSize = isMobile ? 8 : 9;
+    const fontSize = isMobile ? 7 : 8;
     ctx.font = fontSize + 'px "JetBrains Mono"';
-    const textW = ctx.measureText(label).width;
-    const labelX = W / 2;
-    const labelY = y + bowDepth / 2;
-
-    // Clear a dark gap behind the text so it doesn't clash with the arc
-    ctx.fillStyle = '#05070a';
-    ctx.fillRect(labelX - textW / 2 - 6, labelY - fontSize + 1, textW + 12, fontSize + 2);
-
-    ctx.fillStyle = `rgba(${m.color},0.22)`;
-    ctx.textAlign = 'center';
-    ctx.fillText(label, labelX, labelY);
+    ctx.fillStyle = `rgba(${m.color},0.25)`;
+    ctx.textAlign = 'right';
+    ctx.fillText(label, W - 8, y - 4);
   });
 }
 
