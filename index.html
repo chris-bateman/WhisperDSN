@@ -494,6 +494,10 @@ function drawPlanetMarkers() {
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
   const markerX = W - (isMobile ? 14 : 24);
 
+  // DEBUG — remove after confirming planets render
+  ctx.fillStyle = 'red'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('maxRange=' + currentMaxRange.toExponential(2) + ' maxLog=' + maxLog.toFixed(2), 10, H - 30);
+
   PLANET_MARKERS.forEach(p => {
     if (p.distance > currentMaxRange * 1.5) return;
     const logDist = Math.log10(p.distance);
