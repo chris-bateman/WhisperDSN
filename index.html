@@ -509,6 +509,8 @@ function drawDistanceMarkers() {
   const skyTop = H * (isMobile ? 0.12 : 0.06);
   const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
+  const minGap = isMobile ? 18 : 22;
+  let lastY = -100;
 
   DISTANCE_MARKERS.forEach(m => {
     if (m.distance > currentMaxRange * 2) return;
@@ -516,22 +518,33 @@ function drawDistanceMarkers() {
     const yRatio = 1 - (logDist / maxLog);
     const y = skyTop + yRatio * (skyBottom - skyTop);
     if (y < skyTop - 5 || y > skyBottom + 5) return;
+    if (Math.abs(y - lastY) < minGap) return;
+    lastY = y;
 
-    // Dashed line
+    // Gentle arc across full width — bows down slightly in the center
+    const bowDepth = isMobile ? 6 : 10;
     ctx.beginPath();
-    ctx.setLineDash([2, 6]);
-    ctx.moveTo(isMobile ? 8 : 14, y);
-    ctx.lineTo(W - (isMobile ? 8 : 14), y);
-    ctx.strokeStyle = `rgba(${m.color},0.07)`;
+    ctx.moveTo(0, y);
+    ctx.quadraticCurveTo(W / 2, y + bowDepth, W, y);
+    ctx.strokeStyle = `rgba(${m.color},0.06)`;
     ctx.lineWidth = 0.5;
     ctx.stroke();
-    ctx.setLineDash([]);
 
-    // Label on left
-    ctx.font = (isMobile ? '7' : '8') + 'px "JetBrains Mono"';
-    ctx.fillStyle = `rgba(${m.color},0.25)`;
-    ctx.textAlign = 'left';
-    ctx.fillText(m.label, isMobile ? 4 : 8, y - 4);
+    // Label centered on the arc, with a gap cleared behind it
+    const label = m.label;
+    const fontSize = isMobile ? 8 : 9;
+    ctx.font = fontSize + 'px "JetBrains Mono"';
+    const textW = ctx.measureText(label).width;
+    const labelX = W / 2;
+    const labelY = y + bowDepth / 2;
+
+    // Clear a dark gap behind the text so it doesn't clash with the arc
+    ctx.fillStyle = '#05070a';
+    ctx.fillRect(labelX - textW / 2 - 6, labelY - fontSize + 1, textW + 12, fontSize + 2);
+
+    ctx.fillStyle = `rgba(${m.color},0.22)`;
+    ctx.textAlign = 'center';
+    ctx.fillText(label, labelX, labelY);
   });
 }
 
