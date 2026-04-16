@@ -541,6 +541,18 @@ function hashCode(s) {
   return Math.abs(h);
 }
 
+function getDishPos(stationId, dishName) {
+  const s = stationPositions.find(p => p.id === stationId);
+  if (!s) return { x: 0, y: 0 };
+  const dishes = stationDishes[stationId] || [];
+  const idx = dishes.indexOf(dishName);
+  const n = dishes.length;
+  const gap = isMobile ? 22 : 28;
+  const totalWidth = (n - 1) * gap;
+  const x = idx >= 0 ? s.x - totalWidth / 2 + idx * gap : s.x;
+  return { x, y: s.y - 8 };
+}
+
 // ── XML Parser (for embedded snapshot fallback) ──────────────────────
 function parseDSN(xml) {
   const parser = new DOMParser();
@@ -682,27 +694,6 @@ function layoutConnections(newConnections) {
   const skyTop = H * (isMobile ? 0.04 : 0.06);
   const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
 
-  // Assign dish positions — small offsets from station center
-  // Each unique dish gets a consistent position within the station's area
-  const dishPositions = {};
-  conns.forEach(c => {
-    const dishKey = c.station.id + ':' + c.dish;
-    if (!dishPositions[dishKey]) {
-      const stationDishes = conns.filter(d => d.station.id === c.station.id);
-      const uniqueDishes = [...new Set(stationDishes.map(d => d.dish))].sort();
-      const idx = uniqueDishes.indexOf(c.dish);
-      const n = uniqueDishes.length;
-      const dishSpread = isMobile ? 20 : 30;
-      const offset = n > 1 ? ((idx / (n - 1)) - 0.5) * dishSpread * 2 : 0;
-      dishPositions[dishKey] = {
-        x: c.station.x + offset,
-        y: c.station.y - 4,
-      };
-    }
-    c.dishX = dishPositions[dishKey].x;
-    c.dishY = dishPositions[dishKey].y;
-  });
-
   // Group by station for spacecraft fan-out
   const byStation = {};
   conns.forEach(c => {
@@ -802,11 +793,12 @@ function spawnParticles() {
     const speedFactor = Math.max(1 - (logRange / MAX_LOG_RANGE) * 0.85, 0.15);
     const speed = (0.004 + Math.random() * 0.004) * speedFactor;
 
+    const dp = getDishPos(c.station.id, c.dish);
     particles.push({
-      sx: goingUp ? c.dishX : c.renderX,
-      sy: goingUp ? c.dishY : c.renderY,
-      tx: goingUp ? c.renderX : c.dishX,
-      ty: goingUp ? c.renderY : c.dishY,
+      sx: goingUp ? dp.x : c.renderX,
+      sy: goingUp ? dp.y : c.renderY,
+      tx: goingUp ? c.renderX : dp.x,
+      ty: goingUp ? c.renderY : dp.y,
       progress: 0,
       speed,
       r: goingUp ? 212 : 91,
@@ -1412,9 +1404,10 @@ function draw(t) {
 
   // Draw connections (lines from dish positions to spacecraft)
   connections.forEach(c => {
+    const dp = getDishPos(c.station.id, c.dish);
     const active = c.hasActiveUp || c.hasActiveDown;
     ctx.beginPath();
-    ctx.moveTo(c.dishX, c.dishY);
+    ctx.moveTo(dp.x, dp.y);
     ctx.lineTo(c.renderX, c.renderY);
     if (active) {
       const both = c.hasActiveUp && c.hasActiveDown;
@@ -1785,9 +1778,10 @@ function fireLightPulse(found) {
   const duration = Math.min(owlt, MAX_PULSE_DURATION);
   const timeScale = owlt / duration;
 
+  const dp = getDishPos(found.station.id, found.dish);
   lightPulses.push({
-    sx: found.dishX,
-    sy: found.dishY,
+    sx: dp.x,
+    sy: dp.y,
     tx: found.renderX,
     ty: found.renderY,
     startTime: performance.now(),
