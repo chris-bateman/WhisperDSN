@@ -507,14 +507,14 @@ function drawPlanetMarkers() {
     const r = isMobile ? p.radius * 0.6 : p.radius;
     ctx.beginPath();
     ctx.arc(labelX, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = p.color + '40'; // ~25% alpha
+    ctx.fillStyle = p.color + '80'; // ~50% alpha
     ctx.fill();
 
     // Saturn ring
     if (p.ring) {
       ctx.beginPath();
       ctx.ellipse(labelX, y, r * 1.8, r * 0.4, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = p.color + '30';
+      ctx.strokeStyle = p.color + '60';
       ctx.lineWidth = 0.8;
       ctx.stroke();
     }
@@ -525,14 +525,14 @@ function drawPlanetMarkers() {
       ctx.setLineDash([4, 8]);
       ctx.moveTo(labelX + r + 4, y);
       ctx.lineTo(W - 10, y);
-      ctx.strokeStyle = p.color + '14'; // ~8% alpha
+      ctx.strokeStyle = p.color + '30'; // ~19% alpha
       ctx.lineWidth = 0.5;
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Label
       ctx.font = '8px "JetBrains Mono"';
-      ctx.fillStyle = p.color + '4d'; // ~30% alpha
+      ctx.fillStyle = p.color + '70'; // ~44% alpha
       ctx.textAlign = 'left';
       ctx.fillText(p.name, labelX + r + 6, y - 5);
     }
