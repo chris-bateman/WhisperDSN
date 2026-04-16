@@ -57,12 +57,12 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label at the right end of the arc
+    // Label — left side, past the title card
     const fontSize = isMobile ? 7 : 8;
     ctx.font = fontSize + 'px "JetBrains Mono"';
     ctx.fillStyle = `rgba(${m.color},0.3)`;
-    ctx.textAlign = 'right';
-    ctx.fillText(m.label, W - 6, y - 3);
+    ctx.textAlign = 'left';
+    ctx.fillText(m.label, isMobile ? 6 : 200, y - 3);
   });
 }
 
