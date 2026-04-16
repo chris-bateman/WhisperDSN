@@ -209,22 +209,23 @@ const MISSION_LINKS = {
 
 function showNewsInTooltip(scId) {
   const desc = document.getElementById('tt-desc');
-  const missionLink = MISSION_LINKS[scId]
-    ? '<a href="https://' + MISSION_LINKS[scId] + '" target="_blank" rel="noopener">' + MISSION_LINKS[scId] + '</a>'
+  const ml = MISSION_LINKS[scId];
+  const missionHtml = ml
+    ? '<a href="https://' + ml + '" target="_blank" rel="noopener">Mission page \u2197</a>'
     : '';
   const cached = newsCache[scId];
   if (cached && cached.length > 0) {
-    desc.innerHTML = formatNewsItem(cached[0]) + (missionLink ? '\n' + missionLink : '');
+    desc.innerHTML = missionHtml + (missionHtml ? '\n' : '') + formatNewsItem(cached[0]);
   } else if (cached === undefined) {
-    desc.innerHTML = missionLink;
+    desc.innerHTML = missionHtml;
     fetchNews(scId).then(items => {
       if (items.length > 0) {
-        desc.innerHTML = formatNewsItem(items[0]) + (missionLink ? '\n' + missionLink : '');
+        desc.innerHTML = missionHtml + (missionHtml ? '\n' : '') + formatNewsItem(items[0]);
       }
       updateTooltipLinks();
     });
   } else {
-    desc.innerHTML = missionLink;
+    desc.innerHTML = missionHtml;
   }
   updateTooltipLinks();
 }
