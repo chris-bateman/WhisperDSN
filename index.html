@@ -491,7 +491,8 @@ function drawPlanetMarkers() {
   const skyTop = H * (isMobile ? 0.04 : 0.06);
   const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
   const maxLog = MAX_LOG_RANGE;
-  const labelX = isMobile ? 12 : 20;
+  // Mobile: right edge to avoid title/status overlap
+  const labelX = isMobile ? W - 14 : 20;
 
   PLANET_MARKERS.forEach(p => {
     const logDist = Math.log10(p.distance);
@@ -500,7 +501,7 @@ function drawPlanetMarkers() {
     if (y < skyTop - 10 || y > skyBottom + 10) return;
 
     // Planet circle
-    const r = isMobile ? p.radius * 0.7 : p.radius;
+    const r = isMobile ? p.radius * 0.6 : p.radius;
     ctx.beginPath();
     ctx.arc(labelX, y, r, 0, Math.PI * 2);
     ctx.fillStyle = p.color + '40'; // ~25% alpha
@@ -515,18 +516,18 @@ function drawPlanetMarkers() {
       ctx.stroke();
     }
 
-    // Dashed line
-    ctx.beginPath();
-    ctx.setLineDash([4, 8]);
-    ctx.moveTo(labelX + r + 4, y);
-    ctx.lineTo(W - 10, y);
-    ctx.strokeStyle = p.color + '14'; // ~8% alpha
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Label
+    // Dashed line (desktop only — too noisy on mobile)
     if (!isMobile) {
+      ctx.beginPath();
+      ctx.setLineDash([4, 8]);
+      ctx.moveTo(labelX + r + 4, y);
+      ctx.lineTo(W - 10, y);
+      ctx.strokeStyle = p.color + '14'; // ~8% alpha
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label
       ctx.font = '8px "JetBrains Mono"';
       ctx.fillStyle = p.color + '4d'; // ~30% alpha
       ctx.textAlign = 'left';
@@ -1668,15 +1669,15 @@ function draw(t) {
     }
     ctx.stroke();
 
-    // Signal waveform along active connection lines
-    if (active) drawWaveform(c, dp, t);
+    // Signal waveform along active connection lines (skip on mobile — too noisy)
+    if (active && !isMobile) drawWaveform(c, dp, t);
 
     // Spacecraft dot / icon
     const scName = spacecraftNames[c.scId];
     const scColor = active ? (c.hasActiveUp && c.hasActiveDown ? '#6abf8a' : c.hasActiveDown ? '#5b8fb9' : '#d4a26a') : '#2d3748';
     const iconFn = SPACECRAFT_ICONS[c.scId];
     if (iconFn) {
-      const iconSize = isMobile ? (active ? 14 : 10) : (active ? 10 : 7);
+      const iconSize = isMobile ? (active ? 12 : 8) : (active ? 10 : 7);
       iconFn(ctx, c.renderX, c.renderY, iconSize, scColor);
     } else {
       const dotR = isMobile ? (active ? 5 : 3.5) : (active ? 3 : 2);
