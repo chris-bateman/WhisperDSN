@@ -61,14 +61,14 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label — skip if too close to the previous label
-    if (Math.abs(y - lastLabelY) < minLabelGap) return;
-    lastLabelY = y;
+    // Label — put below the line if too close to previous label
+    const below = Math.abs(y - lastLabelY) < minLabelGap;
+    lastLabelY = below ? lastLabelY : y;
     const fontSize = isMobile ? 7 : 8;
     ctx.font = fontSize + 'px "JetBrains Mono"';
     ctx.fillStyle = `rgba(${m.color},0.3)`;
     ctx.textAlign = 'left';
-    ctx.fillText(m.label, isMobile ? 6 : 200, y - 3);
+    ctx.fillText(m.label, isMobile ? 6 : 200, below ? y + fontSize + 2 : y - 3);
   });
 }
 
