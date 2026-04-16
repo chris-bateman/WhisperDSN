@@ -36,7 +36,7 @@ const DISTANCE_MARKERS = [
 
 function drawDistanceMarkers() {
   const skyTop = H * (isMobile ? 0.12 : 0.06);
-  const skyBottom = H * (isMobile || isShortScreen ? 0.50 : 0.68);
+  const skyBottom = H * (isMobile || isShortScreen ? 0.55 : 0.75);
   const maxLog = Math.log10(Math.max(currentMaxRange, 100));
   const minGap = isMobile ? 18 : 22;
   let lastY = -100;
@@ -59,13 +59,14 @@ function drawDistanceMarkers() {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Label on right edge — avoids spacecraft in center
-    const label = m.label;
-    const fontSize = isMobile ? 7 : 8;
-    ctx.font = fontSize + 'px "JetBrains Mono"';
-    ctx.fillStyle = `rgba(${m.color},0.25)`;
-    ctx.textAlign = 'right';
-    ctx.fillText(label, W - 8, y - 4);
+    // Label on left edge, only if below the title card area
+    if (y > (isMobile ? H * 0.14 : 70)) {
+      const fontSize = isMobile ? 7 : 8;
+      ctx.font = fontSize + 'px "JetBrains Mono"';
+      ctx.fillStyle = `rgba(${m.color},0.25)`;
+      ctx.textAlign = 'left';
+      ctx.fillText(m.label, 8, y - 4);
+    }
   });
 }
 

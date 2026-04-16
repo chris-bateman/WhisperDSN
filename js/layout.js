@@ -60,7 +60,7 @@ function layoutConnections(newConnections) {
   const maxRange = Math.max(...conns.map(c => c.range), 1);
   currentMaxRange = maxRange;
   const skyTop = H * (isMobile ? 0.12 : 0.06);
-  const skyBottom = H * (isMobile || isShortScreen ? 0.50 : 0.68);
+  const skyBottom = H * (isMobile || isShortScreen ? 0.55 : 0.75);
 
   // Group by station for spacecraft fan-out
   const byStation = {};
