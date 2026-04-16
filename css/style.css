@@ -310,9 +310,9 @@ canvas { display: block; touch-action: manipulation; }
   .title-card .sub { font-size: 8px; }
   .status-bar { top: 56px; right: auto; left: 16px; text-align: left; }
   .status-bar .active-count { font-size: 10px; }
-  .legend { bottom: 16px; left: 16px; display: flex; gap: 12px; }
-  .legend div { font-size: 0; margin-bottom: 0; gap: 0; }
-  .legend .dot { width: 8px; height: 8px; }
+  .legend { bottom: 16px; left: 16px; display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 200px; }
+  .legend div { font-size: 7px; margin-bottom: 0; gap: 5px; }
+  .legend .dot { width: 6px; height: 6px; }
   .source-link { bottom: 16px; right: 16px; font-size: 8px; }
   .light-counter { bottom: 42px; right: 16px; }
   .light-counter .light-value { font-size: 10px; }
