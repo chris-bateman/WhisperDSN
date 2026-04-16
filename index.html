@@ -726,13 +726,16 @@ function layoutConnections(newConnections) {
   });
 
   // Nudge overlapping spacecraft apart
-  const minDx = isMobile ? 70 : 55;
-  const minDy = isMobile ? 18 : 14;
+  const charW = isMobile ? 7 : 5.5;
+  const minDy = isMobile ? 22 : 18;
   const allConns = conns.slice().sort((a, b) => a.targetY - b.targetY || a.targetX - b.targetX);
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 4; pass++) {
     for (let i = 0; i < allConns.length; i++) {
       for (let j = i + 1; j < allConns.length; j++) {
         const a = allConns[i], b = allConns[j];
+        const nameA = (spacecraftNames[a.scId] || a.scId).length;
+        const nameB = (spacecraftNames[b.scId] || b.scId).length;
+        const minDx = (nameA + nameB) / 2 * charW;
         const dx = Math.abs(a.targetX - b.targetX);
         const dy = Math.abs(a.targetY - b.targetY);
         if (dx < minDx && dy < minDy) {
