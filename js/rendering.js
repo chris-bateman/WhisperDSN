@@ -50,7 +50,7 @@ function drawDistanceMarkers() {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.quadraticCurveTo(W / 2, y + bowDepth, W, y);
-    ctx.strokeStyle = `rgba(${m.color},0.06)`;
+    ctx.strokeStyle = `rgba(${m.color},0.12)`;
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
