@@ -314,8 +314,8 @@ canvas { display: block; touch-action: manipulation; }
   .legend div { font-size: 0; margin-bottom: 0; gap: 0; }
   .legend .dot { width: 8px; height: 8px; }
   .source-link { bottom: 16px; right: 16px; font-size: 8px; }
-  .light-counter { bottom: auto; top: 16px; right: 16px; }
-  .light-counter .light-value { font-size: 11px; }
+  .light-counter { bottom: 42px; right: 16px; }
+  .light-counter .light-value { font-size: 10px; }
   .audio-toggle { top: 50px; right: 16px; width: 28px; height: 28px; font-size: 14px; }
   .about-panel { padding: 24px 20px; }
   .sc-tooltip { max-width: 220px; }
