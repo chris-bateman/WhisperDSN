@@ -191,20 +191,20 @@ canvas.addEventListener('mouseleave', () => {
 
 // ── News in Tooltip ─────────────────────────────────────────────────
 const MISSION_LINKS = {
-  JWST: 'nasa.gov/mission/webb', M20: 'nasa.gov/mission/mars-2020-perseverance',
-  MSL: 'nasa.gov/mission/msl-curiosity', JNO: 'nasa.gov/mission/juno',
-  VGR1: 'nasa.gov/mission/voyager-interstellar-mission', VGR2: 'nasa.gov/mission/voyager-interstellar-mission',
-  NHPC: 'nasa.gov/mission/new-horizons', SPP: 'nasa.gov/mission/parker-solar-probe',
-  MRO: 'nasa.gov/mission/mro', M01O: 'nasa.gov/mission/mars-odyssey',
-  MVN: 'nasa.gov/mission/maven', MEX: 'esa.int/mars-express',
-  TGO: 'esa.int/exomars-tgo', BEPI: 'esa.int/bepicolombo',
-  SOHO: 'nasa.gov/mission/soho', STA: 'nasa.gov/mission/stereo',
-  LRO: 'nasa.gov/mission/lro', KPLO: 'kari.re.kr',
-  CHDR: 'nasa.gov/mission/chandra', HST: 'nasa.gov/mission/hubble',
-  XMM: 'esa.int/xmm-newton', TESS: 'nasa.gov/mission/tess',
+  JWST: 'science.nasa.gov/mission/webb', M20: 'science.nasa.gov/mission/mars-2020-perseverance',
+  MSL: 'science.nasa.gov/mission/msl-curiosity', JNO: 'science.nasa.gov/mission/juno',
+  VGR1: 'science.nasa.gov/mission/voyager', VGR2: 'science.nasa.gov/mission/voyager',
+  NHPC: 'science.nasa.gov/mission/new-horizons', SPP: 'science.nasa.gov/mission/parker-solar-probe',
+  MRO: 'science.nasa.gov/mission/mars-reconnaissance-orbiter', M01O: 'science.nasa.gov/mission/odyssey',
+  MVN: 'science.nasa.gov/mission/maven', MEX: 'esa.int/Science_Exploration/Space_Science/Mars_Express',
+  TGO: 'esa.int/Science_Exploration/Space_Science/ExoMars', BEPI: 'esa.int/bepicolombo',
+  SOHO: 'science.nasa.gov/mission/soho', STA: 'science.nasa.gov/mission/stereo',
+  LRO: 'science.nasa.gov/mission/lro', KPLO: 'kari.re.kr',
+  CHDR: 'science.nasa.gov/mission/chandra', HST: 'science.nasa.gov/mission/hubble',
+  XMM: 'esa.int/xmm-newton', TESS: 'science.nasa.gov/mission/tess',
   GAIA: 'esa.int/gaia', EURC: 'esa.int/euclid',
-  PSYC: 'nasa.gov/mission/psyche', LUCY: 'nasa.gov/mission/lucy',
-  DSCO: 'nasa.gov/mission/dscovr',
+  PSYC: 'science.nasa.gov/mission/psyche', LUCY: 'science.nasa.gov/mission/lucy',
+  DSCO: 'science.nasa.gov/mission/dscovr',
 };
 
 function showNewsInTooltip(scId) {
