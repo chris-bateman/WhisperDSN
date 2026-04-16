@@ -203,6 +203,7 @@ function parseXML(xml) {
           upSignalActive: scUp.some(s => s.active === 'true'),
           downSignalActive: scDown.some(s => s.active === 'true'),
           dataRate: scAll.reduce((max, s) => Math.max(max, parseFloat(s.dataRate) || 0), 0),
+          band: (scDown[0] || scUp[0] || {}).band || '',
         });
       }
 

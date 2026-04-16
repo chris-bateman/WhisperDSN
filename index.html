@@ -436,6 +436,19 @@ let isMobile = false;
 let isShortScreen = false;
 let activeTooltipConn = null;
 let stationPositions = [];
+const MAX_LOG_RANGE = Math.log10(25e9); // ~Voyager distance
+
+// ── Planet Distance Markers ─────────────────────────────────────────
+const PLANET_MARKERS = [
+  { name: 'Mercury', distance: 91.7e6,  color: '#8c7e6d', radius: 2.5 },
+  { name: 'Venus',   distance: 41.4e6,  color: '#c9a96e', radius: 3.5 },
+  { name: 'Moon',    distance: 384400,   color: '#a0a0a0', radius: 2 },
+  { name: 'Mars',    distance: 225e6,    color: '#c0603a', radius: 3 },
+  { name: 'Jupiter', distance: 778e6,    color: '#c8a55a', radius: 6 },
+  { name: 'Saturn',  distance: 1.4e9,    color: '#d4b86a', radius: 5, ring: true },
+  { name: 'Uranus',  distance: 2.87e9,   color: '#6bb5c9', radius: 4 },
+  { name: 'Neptune', distance: 4.5e9,    color: '#4a6fa5', radius: 3.5 },
+];
 
 function resize() {
   W = canvas.width = window.innerWidth;
@@ -471,6 +484,54 @@ function drawStarfield(t) {
     const alpha = s.brightness * (0.5 + 0.5 * Math.sin(t * s.twinkleSpeed + s.twinklePhase));
     ctx.fillStyle = `rgba(200,214,229,${alpha})`;
     ctx.fillRect(s.x, s.y, 1, 1);
+  });
+}
+
+function drawPlanetMarkers() {
+  const skyTop = H * (isMobile ? 0.04 : 0.06);
+  const skyBottom = H * (isMobile || isShortScreen ? 0.40 : 0.55);
+  const maxLog = MAX_LOG_RANGE;
+  const labelX = isMobile ? 12 : 20;
+
+  PLANET_MARKERS.forEach(p => {
+    const logDist = Math.log10(p.distance);
+    const yRatio = 1 - (logDist / maxLog);
+    const y = skyTop + yRatio * (skyBottom - skyTop);
+    if (y < skyTop - 10 || y > skyBottom + 10) return;
+
+    // Planet circle
+    const r = isMobile ? p.radius * 0.7 : p.radius;
+    ctx.beginPath();
+    ctx.arc(labelX, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color + '40'; // ~25% alpha
+    ctx.fill();
+
+    // Saturn ring
+    if (p.ring) {
+      ctx.beginPath();
+      ctx.ellipse(labelX, y, r * 1.8, r * 0.4, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = p.color + '30';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    // Dashed line
+    ctx.beginPath();
+    ctx.setLineDash([4, 8]);
+    ctx.moveTo(labelX + r + 4, y);
+    ctx.lineTo(W - 10, y);
+    ctx.strokeStyle = p.color + '14'; // ~8% alpha
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label
+    if (!isMobile) {
+      ctx.font = '8px "JetBrains Mono"';
+      ctx.fillStyle = p.color + '4d'; // ~30% alpha
+      ctx.textAlign = 'left';
+      ctx.fillText(p.name, labelX + r + 6, y - 5);
+    }
   });
 }
 
@@ -554,6 +615,134 @@ function getDishPos(stationId, dishName) {
   return { x, y: s.y - 8 };
 }
 
+// ── Spacecraft Icons ────────────────────────────────────────────────
+function drawVoyagerIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 0.8;
+  // Dish
+  ctx.beginPath(); ctx.arc(x, y - s * 0.3, s * 0.35, Math.PI, 0); ctx.stroke();
+  // Boom
+  ctx.beginPath(); ctx.moveTo(x, y - s * 0.3); ctx.lineTo(x, y + s * 0.5); ctx.stroke();
+  // Magnetometer crossbar
+  ctx.beginPath(); ctx.moveTo(x - s * 0.25, y + s * 0.3); ctx.lineTo(x + s * 0.25, y + s * 0.3); ctx.stroke();
+}
+
+function drawJWSTIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+  const r = s * 0.4;
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i - Math.PI / 6;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    ctx.stroke();
+  }
+  // Hex outline
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i - Math.PI / 6;
+    const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath(); ctx.stroke();
+}
+
+function drawRoverIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 0.8;
+  // Body
+  const bw = s * 0.5, bh = s * 0.25;
+  ctx.strokeRect(x - bw, y - bh * 0.3, bw * 2, bh);
+  // Wheels
+  ctx.beginPath(); ctx.arc(x - bw * 0.6, y + bh * 0.7 + 1, s * 0.15, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x + bw * 0.6, y + bh * 0.7 + 1, s * 0.15, 0, Math.PI * 2); ctx.stroke();
+  // Mast
+  ctx.beginPath(); ctx.moveTo(x + bw * 0.3, y - bh * 0.3); ctx.lineTo(x + bw * 0.3, y - s * 0.5); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x + bw * 0.3, y - s * 0.55, 1, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawOrbiterIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+  // Dish
+  ctx.beginPath(); ctx.arc(x - s * 0.15, y - s * 0.15, s * 0.25, Math.PI * 0.8, Math.PI * 2.2); ctx.stroke();
+  // Body
+  ctx.beginPath(); ctx.moveTo(x - s * 0.1, y); ctx.lineTo(x + s * 0.3, y); ctx.stroke();
+  // Solar panels
+  ctx.beginPath(); ctx.moveTo(x + s * 0.1, y - s * 0.35); ctx.lineTo(x + s * 0.1, y + s * 0.35); ctx.stroke();
+  ctx.strokeRect(x + s * 0.05, y - s * 0.35, s * 0.1, s * 0.2);
+  ctx.strokeRect(x + s * 0.05, y + s * 0.15, s * 0.1, s * 0.2);
+}
+
+function drawTelescopeIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+  // Tube
+  ctx.strokeRect(x - s * 0.15, y - s * 0.4, s * 0.3, s * 0.8);
+  // Aperture
+  ctx.beginPath(); ctx.arc(x, y - s * 0.4, s * 0.15, 0, Math.PI * 2); ctx.stroke();
+  // Solar panels
+  ctx.beginPath(); ctx.moveTo(x - s * 0.15, y); ctx.lineTo(x - s * 0.45, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + s * 0.15, y); ctx.lineTo(x + s * 0.45, y); ctx.stroke();
+}
+
+function drawSolarIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+  // Central circle
+  ctx.beginPath(); ctx.arc(x, y, s * 0.2, 0, Math.PI * 2); ctx.stroke();
+  // Rays
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 * (i * 2 + 1);
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * s * 0.28, y + Math.sin(a) * s * 0.28);
+    ctx.lineTo(x + Math.cos(a) * s * 0.45, y + Math.sin(a) * s * 0.45);
+    ctx.stroke();
+  }
+}
+
+function drawLunarIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+  // Small box body
+  ctx.strokeRect(x - s * 0.2, y - s * 0.15, s * 0.4, s * 0.3);
+  // Solar panel lines
+  ctx.beginPath(); ctx.moveTo(x - s * 0.2, y); ctx.lineTo(x - s * 0.45, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + s * 0.2, y); ctx.lineTo(x + s * 0.45, y); ctx.stroke();
+}
+
+function drawNewHorizonsIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+  // Triangular body
+  ctx.beginPath();
+  ctx.moveTo(x, y - s * 0.3);
+  ctx.lineTo(x - s * 0.25, y + s * 0.3);
+  ctx.lineTo(x + s * 0.25, y + s * 0.3);
+  ctx.closePath(); ctx.stroke();
+  // Dish on top
+  ctx.beginPath(); ctx.arc(x, y - s * 0.35, s * 0.18, Math.PI, 0); ctx.stroke();
+}
+
+function drawProbeIcon(ctx, x, y, s, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+  // Small dish
+  ctx.beginPath(); ctx.arc(x, y - s * 0.2, s * 0.2, Math.PI * 0.8, Math.PI * 2.2); ctx.stroke();
+  // Body line
+  ctx.beginPath(); ctx.moveTo(x, y - s * 0.1); ctx.lineTo(x, y + s * 0.3); ctx.stroke();
+  // Fins
+  ctx.beginPath(); ctx.moveTo(x, y + s * 0.15); ctx.lineTo(x - s * 0.25, y + s * 0.35); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y + s * 0.15); ctx.lineTo(x + s * 0.25, y + s * 0.35); ctx.stroke();
+}
+
+const SPACECRAFT_ICONS = {
+  VGR1: drawVoyagerIcon, VGR2: drawVoyagerIcon,
+  JWST: drawJWSTIcon,
+  MSL: drawRoverIcon, M20: drawRoverIcon,
+  MRO: drawOrbiterIcon, M01O: drawOrbiterIcon, JNO: drawOrbiterIcon,
+  MEX: drawOrbiterIcon, MVN: drawOrbiterIcon, EURC: drawOrbiterIcon,
+  PSYC: drawOrbiterIcon, LUCY: drawOrbiterIcon, BEPI: drawOrbiterIcon, TGO: drawOrbiterIcon,
+  SOHO: drawSolarIcon, SPP: drawSolarIcon, STA: drawSolarIcon, DSCO: drawSolarIcon, IMAP: drawSolarIcon,
+  CHDR: drawTelescopeIcon, HST: drawTelescopeIcon, XMM: drawTelescopeIcon,
+  TESS: drawTelescopeIcon, GAIA: drawTelescopeIcon,
+  LRO: drawLunarIcon, KPLO: drawLunarIcon, CH3: drawLunarIcon,
+  NHPC: drawNewHorizonsIcon,
+  CGO: drawProbeIcon, WIND: drawProbeIcon, ACE: drawProbeIcon,
+};
+
 // ── XML Parser (for embedded snapshot fallback) ──────────────────────
 function parseDSN(xml) {
   const parser = new DOMParser();
@@ -600,10 +789,13 @@ function parseDSN(xml) {
         ...Array.from(downSignals).filter(scSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0),
         ...Array.from(upSignals).filter(scSignals).map(s => parseFloat(s.getAttribute('dataRate')) || 0)
       );
+      const scDownArr = Array.from(downSignals).filter(scSignals);
+      const scUpArr = Array.from(upSignals).filter(scSignals);
+      const band = (scDownArr[0] || scUpArr[0] || { getAttribute: () => '' }).getAttribute('band') || '';
 
       newConnections.push({
         station: stationPos, dish: dishName, scId, range, rtlt,
-        hasActiveUp, hasActiveDown, activity, dataRate: maxDataRate,
+        hasActiveUp, hasActiveDown, activity, dataRate: maxDataRate, band,
         azimuth, elevation,
         targetX: 0, targetY: 0, renderX: 0, renderY: 0,
       });
@@ -653,6 +845,7 @@ function parseDSNJSON(data) {
           hasActiveDown: target.downSignalActive,
           activity: dish.activity,
           dataRate: target.dataRate,
+          band: target.band || '',
           azimuth: dish.azimuth || 0,
           elevation: dish.elevation || 0,
           targetX: 0, targetY: 0, renderX: 0, renderY: 0,
@@ -674,7 +867,7 @@ function layoutConnections(newConnections) {
       ts: now, range: c.range, rtlt: c.rtlt,
       stationId: c.station.id, dish: c.dish,
       hasActiveUp: c.hasActiveUp, hasActiveDown: c.hasActiveDown,
-      activity: c.activity, dataRate: c.dataRate,
+      activity: c.activity, dataRate: c.dataRate, band: c.band || '',
       azimuth: c.azimuth, elevation: c.elevation,
     };
   });
@@ -690,7 +883,7 @@ function layoutConnections(newConnections) {
       station: stationPos, dish: data.dish, scId,
       range: data.range, rtlt: data.rtlt,
       hasActiveUp: false, hasActiveDown: false,
-      activity: data.activity || '', dataRate: 0,
+      activity: data.activity || '', dataRate: 0, band: data.band || '',
       azimuth: data.azimuth || 0, elevation: data.elevation || 0,
       targetX: 0, targetY: 0, renderX: 0, renderY: 0,
       stale: true,
@@ -787,8 +980,50 @@ function layoutConnections(newConnections) {
     .reduce((sum, c) => sum + (c.rtlt > 0 ? c.rtlt / 2 : 0), 0);
 }
 
+// ── Signal Waveform ─────────────────────────────────────────────────
+const BAND_WAVELENGTH = { S: 40, X: 20, K: 10 };
+
+function drawWaveform(c, dp, t) {
+  const dx = c.renderX - dp.x, dy = c.renderY - dp.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 20) return;
+
+  // Perpendicular direction
+  const nx = -dy / len, ny = dx / len;
+
+  // Band → wavelength
+  const band = (c.band || '').toUpperCase().charAt(0);
+  const wl = BAND_WAVELENGTH[band] || 25;
+
+  // Data rate → amplitude (subtle)
+  const amp = Math.min(Math.max(Math.log10(Math.max(c.dataRate, 1)) / 6, 0.15), 1.0) * 3;
+
+  // Scroll direction: uplink scrolls toward spacecraft, downlink toward dish
+  const dir = c.hasActiveUp && !c.hasActiveDown ? 1 : -1;
+  const scroll = t * 0.002 * dir;
+
+  const both = c.hasActiveUp && c.hasActiveDown;
+  const r = both ? 106 : c.hasActiveDown ? 91 : 212;
+  const g = both ? 191 : c.hasActiveDown ? 143 : 162;
+  const b = both ? 138 : c.hasActiveDown ? 185 : 106;
+
+  ctx.beginPath();
+  const step = 4;
+  for (let d = 0; d <= len; d += step) {
+    const frac = d / len;
+    const bx = dp.x + dx * frac;
+    const by = dp.y + dy * frac;
+    const wave = Math.sin((d / wl) * Math.PI * 2 + scroll) * amp;
+    const px = bx + nx * wave;
+    const py = by + ny * wave;
+    d === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = `rgba(${r},${g},${b},0.06)`;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+}
+
 // ── Particles ────────────────────────────────────────────────────────
-const MAX_LOG_RANGE = Math.log10(25e9); // ~Voyager distance
 
 function spawnParticles() {
   connections.forEach(c => {
@@ -1389,6 +1624,9 @@ function draw(t) {
   // Starfield
   drawStarfield(t);
 
+  // Planet distance markers
+  drawPlanetMarkers();
+
   // Drifting asteroid easter egg hint
   updateEasterRock();
   drawEasterRock();
@@ -1430,13 +1668,23 @@ function draw(t) {
     }
     ctx.stroke();
 
-    // Spacecraft dot
+    // Signal waveform along active connection lines
+    if (active) drawWaveform(c, dp, t);
+
+    // Spacecraft dot / icon
     const scName = spacecraftNames[c.scId];
-    const dotR = isMobile ? (active ? 5 : 3.5) : (active ? 3 : 2);
-    ctx.beginPath();
-    ctx.arc(c.renderX, c.renderY, dotR, 0, Math.PI * 2);
-    ctx.fillStyle = active ? (c.hasActiveUp && c.hasActiveDown ? '#6abf8a' : c.hasActiveDown ? '#5b8fb9' : '#d4a26a') : '#2d3748';
-    ctx.fill();
+    const scColor = active ? (c.hasActiveUp && c.hasActiveDown ? '#6abf8a' : c.hasActiveDown ? '#5b8fb9' : '#d4a26a') : '#2d3748';
+    const iconFn = SPACECRAFT_ICONS[c.scId];
+    if (iconFn) {
+      const iconSize = isMobile ? (active ? 14 : 10) : (active ? 10 : 7);
+      iconFn(ctx, c.renderX, c.renderY, iconSize, scColor);
+    } else {
+      const dotR = isMobile ? (active ? 5 : 3.5) : (active ? 3 : 2);
+      ctx.beginPath();
+      ctx.arc(c.renderX, c.renderY, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = scColor;
+      ctx.fill();
+    }
 
     // Spacecraft label
     const label = scName || c.scId;
